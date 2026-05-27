@@ -1,0 +1,993 @@
+{
+  "name": "Scenario 3 - Late starters now clashing",
+  "snapshot_time": "20:45",
+  "charge_minutes": 15,
+  "travel_minutes_per_leg": 150,
+  "weights": {
+    "individual": 1.0,
+    "operator": 1.5,
+    "network": 1.0
+  },
+  "stations": {
+    "A": {
+      "chargers": 2
+    },
+    "B": {
+      "chargers": 2
+    },
+    "C": {
+      "chargers": 2
+    },
+    "D": {
+      "chargers": 2
+    }
+  },
+  "buses": [
+    {
+      "id": "s3-01",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "15:22",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~7 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "20:52",
+          "earliest_arrival": "20:52"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "23:37",
+          "earliest_arrival": "23:37"
+        }
+      ]
+    },
+    {
+      "id": "s3-02",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "15:00",
+      "status": "traveling",
+      "location_desc": "in transit B->A, ~150 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "23:15",
+          "earliest_arrival": "23:15"
+        }
+      ]
+    },
+    {
+      "id": "s3-03",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "15:11",
+      "status": "charging",
+      "location_desc": "charging at C",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "23:26",
+          "earliest_arrival": "23:26"
+        }
+      ],
+      "charging_at": "C",
+      "charging_started_at": "20:41"
+    },
+    {
+      "id": "s3-04",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "15:17",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~2 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "20:47",
+          "earliest_arrival": "20:47"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "23:32",
+          "earliest_arrival": "23:32"
+        }
+      ]
+    },
+    {
+      "id": "s3-05",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "16:12",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~57 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "21:42",
+          "earliest_arrival": "21:42"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "00:27",
+          "earliest_arrival": "00:27"
+        }
+      ]
+    },
+    {
+      "id": "s3-06",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "15:48",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~33 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "21:18",
+          "earliest_arrival": "21:18"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "00:03",
+          "earliest_arrival": "00:03"
+        }
+      ]
+    },
+    {
+      "id": "s3-07",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "16:35",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~80 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:05",
+          "earliest_arrival": "22:05"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "00:50",
+          "earliest_arrival": "00:50"
+        }
+      ]
+    },
+    {
+      "id": "s3-08",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "16:42",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~87 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:12",
+          "earliest_arrival": "22:12"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "00:57",
+          "earliest_arrival": "00:57"
+        }
+      ]
+    },
+    {
+      "id": "s3-09",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "16:56",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~101 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:26",
+          "earliest_arrival": "22:26"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "01:11",
+          "earliest_arrival": "01:11"
+        }
+      ]
+    },
+    {
+      "id": "s3-10",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "16:28",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~73 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "21:58",
+          "earliest_arrival": "21:58"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "00:43",
+          "earliest_arrival": "00:43"
+        }
+      ]
+    },
+    {
+      "id": "s3-11",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "16:48",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~93 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:18",
+          "earliest_arrival": "22:18"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "01:03",
+          "earliest_arrival": "01:03"
+        }
+      ]
+    },
+    {
+      "id": "s3-12",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "16:51",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~96 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:21",
+          "earliest_arrival": "22:21"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "01:06",
+          "earliest_arrival": "01:06"
+        }
+      ]
+    },
+    {
+      "id": "s3-13",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "17:10",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~115 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:40",
+          "earliest_arrival": "22:40"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "01:25",
+          "earliest_arrival": "01:25"
+        }
+      ]
+    },
+    {
+      "id": "s3-14",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "17:19",
+      "status": "traveling",
+      "location_desc": "in transit C->B, ~124 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:49",
+          "earliest_arrival": "22:49"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "01:34",
+          "earliest_arrival": "01:34"
+        }
+      ]
+    },
+    {
+      "id": "s3-15",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "17:35",
+      "status": "traveling",
+      "location_desc": "in transit B->C, ~140 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "23:05",
+          "earliest_arrival": "23:05"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "01:50",
+          "earliest_arrival": "01:50"
+        }
+      ]
+    },
+    {
+      "id": "s3-16",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "18:11",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~11 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "20:56",
+          "earliest_arrival": "20:56"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "23:41",
+          "earliest_arrival": "23:41"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "02:26",
+          "earliest_arrival": "02:26"
+        }
+      ]
+    },
+    {
+      "id": "s3-17",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "17:54",
+      "status": "charging",
+      "location_desc": "charging at B",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "23:24",
+          "earliest_arrival": "23:24"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "02:09",
+          "earliest_arrival": "02:09"
+        }
+      ],
+      "charging_at": "B",
+      "charging_started_at": "20:39"
+    },
+    {
+      "id": "s3-18",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "18:51",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~51 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "21:36",
+          "earliest_arrival": "21:36"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "00:21",
+          "earliest_arrival": "00:21"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "03:06",
+          "earliest_arrival": "03:06"
+        }
+      ]
+    },
+    {
+      "id": "s3-19",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "18:22",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~22 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "21:07",
+          "earliest_arrival": "21:07"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "23:52",
+          "earliest_arrival": "23:52"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "02:37",
+          "earliest_arrival": "02:37"
+        }
+      ]
+    },
+    {
+      "id": "s3-20",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "18:35",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~35 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "21:20",
+          "earliest_arrival": "21:20"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "00:05",
+          "earliest_arrival": "00:05"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "02:50",
+          "earliest_arrival": "02:50"
+        }
+      ]
+    },
+    {
+      "id": "s3-21",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "18:47",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~47 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "21:32",
+          "earliest_arrival": "21:32"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "00:17",
+          "earliest_arrival": "00:17"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "03:02",
+          "earliest_arrival": "03:02"
+        }
+      ]
+    },
+    {
+      "id": "s3-22",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "18:58",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~58 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "21:43",
+          "earliest_arrival": "21:43"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "00:28",
+          "earliest_arrival": "00:28"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "03:13",
+          "earliest_arrival": "03:13"
+        }
+      ]
+    },
+    {
+      "id": "s3-23",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "19:34",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~94 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:19",
+          "earliest_arrival": "22:19"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "01:04",
+          "earliest_arrival": "01:04"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "03:49",
+          "earliest_arrival": "03:49"
+        }
+      ]
+    },
+    {
+      "id": "s3-24",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "19:52",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~112 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:37",
+          "earliest_arrival": "22:37"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "01:22",
+          "earliest_arrival": "01:22"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "04:07",
+          "earliest_arrival": "04:07"
+        }
+      ]
+    },
+    {
+      "id": "s3-25",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "19:29",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~89 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:14",
+          "earliest_arrival": "22:14"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "00:59",
+          "earliest_arrival": "00:59"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "03:44",
+          "earliest_arrival": "03:44"
+        }
+      ]
+    },
+    {
+      "id": "s3-26",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "19:42",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~102 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:27",
+          "earliest_arrival": "22:27"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "01:12",
+          "earliest_arrival": "01:12"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "03:57",
+          "earliest_arrival": "03:57"
+        }
+      ]
+    },
+    {
+      "id": "s3-27",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "20:01",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~121 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "22:46",
+          "earliest_arrival": "22:46"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "01:31",
+          "earliest_arrival": "01:31"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "04:16",
+          "earliest_arrival": "04:16"
+        }
+      ]
+    },
+    {
+      "id": "s3-28",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "20:05",
+      "status": "traveling",
+      "location_desc": "in transit D->C, ~125 min to arrival",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "22:50",
+          "earliest_arrival": "22:50"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "01:35",
+          "earliest_arrival": "01:35"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "04:20",
+          "earliest_arrival": "04:20"
+        }
+      ]
+    },
+    {
+      "id": "s3-29",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "20:23",
+      "status": "traveling",
+      "location_desc": "in transit A->B, ~143 min to arrival",
+      "upcoming": [
+        {
+          "station": "B",
+          "scheduled_arrival": "23:08",
+          "earliest_arrival": "23:08"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "01:53",
+          "earliest_arrival": "01:53"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "04:38",
+          "earliest_arrival": "04:38"
+        }
+      ]
+    },
+    {
+      "id": "s3-30",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "20:33",
+      "status": "charging",
+      "location_desc": "charging at D",
+      "upcoming": [
+        {
+          "station": "C",
+          "scheduled_arrival": "23:18",
+          "earliest_arrival": "23:18"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "02:03",
+          "earliest_arrival": "02:03"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "04:48",
+          "earliest_arrival": "04:48"
+        }
+      ],
+      "charging_at": "D",
+      "charging_started_at": "20:33"
+    },
+    {
+      "id": "s3-31",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "21:20",
+      "status": "traveling",
+      "location_desc": "in transit D->A, ~35 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "21:20",
+          "earliest_arrival": "21:20"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "00:05",
+          "earliest_arrival": "00:05"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "02:50",
+          "earliest_arrival": "02:50"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "05:35",
+          "earliest_arrival": "05:35"
+        }
+      ]
+    },
+    {
+      "id": "s3-32",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "20:51",
+      "status": "traveling",
+      "location_desc": "in transit A->D, ~6 min to arrival",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "20:51",
+          "earliest_arrival": "20:51"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "23:36",
+          "earliest_arrival": "23:36"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "02:21",
+          "earliest_arrival": "02:21"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "05:06",
+          "earliest_arrival": "05:06"
+        }
+      ]
+    },
+    {
+      "id": "s3-33",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "21:13",
+      "status": "traveling",
+      "location_desc": "in transit D->A, ~28 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "21:13",
+          "earliest_arrival": "21:13"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "23:58",
+          "earliest_arrival": "23:58"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "02:43",
+          "earliest_arrival": "02:43"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "05:28",
+          "earliest_arrival": "05:28"
+        }
+      ]
+    },
+    {
+      "id": "s3-34",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "21:27",
+      "status": "traveling",
+      "location_desc": "in transit A->D, ~42 min to arrival",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "21:27",
+          "earliest_arrival": "21:27"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "00:12",
+          "earliest_arrival": "00:12"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "02:57",
+          "earliest_arrival": "02:57"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "05:42",
+          "earliest_arrival": "05:42"
+        }
+      ]
+    },
+    {
+      "id": "s3-35",
+      "operator": "freshbus",
+      "direction": "A->D",
+      "started_at": "21:54",
+      "status": "traveling",
+      "location_desc": "in transit D->A, ~69 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "21:54",
+          "earliest_arrival": "21:54"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "00:39",
+          "earliest_arrival": "00:39"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "03:24",
+          "earliest_arrival": "03:24"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "06:09",
+          "earliest_arrival": "06:09"
+        }
+      ]
+    },
+    {
+      "id": "s3-36",
+      "operator": "flixbus",
+      "direction": "D->A",
+      "started_at": "21:41",
+      "status": "traveling",
+      "location_desc": "in transit A->D, ~56 min to arrival",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "21:41",
+          "earliest_arrival": "21:41"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "00:26",
+          "earliest_arrival": "00:26"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "03:11",
+          "earliest_arrival": "03:11"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "05:56",
+          "earliest_arrival": "05:56"
+        }
+      ]
+    },
+    {
+      "id": "s3-37",
+      "operator": "kpn",
+      "direction": "A->D",
+      "started_at": "22:37",
+      "status": "traveling",
+      "location_desc": "in transit D->A, ~112 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "22:37",
+          "earliest_arrival": "22:37"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "01:22",
+          "earliest_arrival": "01:22"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "04:07",
+          "earliest_arrival": "04:07"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "06:52",
+          "earliest_arrival": "06:52"
+        }
+      ]
+    },
+    {
+      "id": "s3-38",
+      "operator": "freshbus",
+      "direction": "D->A",
+      "started_at": "22:37",
+      "status": "traveling",
+      "location_desc": "in transit A->D, ~112 min to arrival",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "22:37",
+          "earliest_arrival": "22:37"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "01:22",
+          "earliest_arrival": "01:22"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "04:07",
+          "earliest_arrival": "04:07"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "06:52",
+          "earliest_arrival": "06:52"
+        }
+      ]
+    },
+    {
+      "id": "s3-39",
+      "operator": "flixbus",
+      "direction": "A->D",
+      "started_at": "22:48",
+      "status": "traveling",
+      "location_desc": "in transit D->A, ~123 min to arrival",
+      "upcoming": [
+        {
+          "station": "A",
+          "scheduled_arrival": "22:48",
+          "earliest_arrival": "22:48"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "01:33",
+          "earliest_arrival": "01:33"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "04:18",
+          "earliest_arrival": "04:18"
+        },
+        {
+          "station": "D",
+          "scheduled_arrival": "07:03",
+          "earliest_arrival": "07:03"
+        }
+      ]
+    },
+    {
+      "id": "s3-40",
+      "operator": "kpn",
+      "direction": "D->A",
+      "started_at": "22:31",
+      "status": "traveling",
+      "location_desc": "in transit A->D, ~106 min to arrival",
+      "upcoming": [
+        {
+          "station": "D",
+          "scheduled_arrival": "22:31",
+          "earliest_arrival": "22:31"
+        },
+        {
+          "station": "C",
+          "scheduled_arrival": "01:16",
+          "earliest_arrival": "01:16"
+        },
+        {
+          "station": "B",
+          "scheduled_arrival": "04:01",
+          "earliest_arrival": "04:01"
+        },
+        {
+          "station": "A",
+          "scheduled_arrival": "06:46",
+          "earliest_arrival": "06:46"
+        }
+      ]
+    }
+  ]
+}
