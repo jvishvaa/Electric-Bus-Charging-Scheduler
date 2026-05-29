@@ -20,7 +20,7 @@ THE KEY TIMING ARITHMETIC (understand this for the interview):
 PERTURBATIONS:
   Each scenario adds extra minutes on certain legs to simulate real-world
   conditions (traffic, early drivers, etc.). The perturbation only affects
-  earliest_arrival — scheduled_arrival always uses nominal timing.
+  actual_arrival — scheduled_arrival always uses nominal timing.
 
 CUMULATIVE WAIT:
   We don't know actual wait times during generation (that's the solver's job).
@@ -84,12 +84,12 @@ def _plan_bus(bus_id: str, operator: str, direction: str,
     perturbation_fn(from_station, to_station) → extra minutes added to REAL
     travel time on that leg. Scheduled time is always nominal (no perturbation).
 
-    INTERVIEW: "What does earliest_arrival represent vs scheduled_arrival?"
+    INTERVIEW: "What does actual_arrival represent vs scheduled_arrival?"
       scheduled = what the original timetable promised.
-      earliest  = what physics allows given current position and speed.
-      If earliest > scheduled, the bus is LATE.
-      If earliest < scheduled, the bus is EARLY.
-      The solver uses earliest as the hard lower bound for when charging can start.
+      actual    = what physics allows given current position and speed.
+      If actual > scheduled, the bus is LATE.
+      If actual < scheduled, the bus is EARLY.
+      The solver uses actual as the hard lower bound for when charging can start.
     """
     perturb = perturbation_fn or (lambda a, b: 0)
     route = _route_for(direction)
@@ -160,7 +160,7 @@ def _plan_bus(bus_id: str, operator: str, direction: str,
         upcoming.append({
             "station": station,
             "scheduled_arrival": _from_snapshot(sched[station]),
-            "earliest_arrival": _from_snapshot(real[station]),
+            "actual_arrival": _from_snapshot(real[station]),
             "cumulative_wait_min": 0,  # solver fills this in after solving
             "delay_min": real[station] - sched[station],
         })
@@ -262,7 +262,7 @@ def _make_fleet(label: str, started_offsets: list[int], directions: list[str],
             b["upcoming"].insert(0, {
                 "station": station,
                 "scheduled_arrival": _from_snapshot(0),  # approximate
-                "earliest_arrival": _from_snapshot(0),
+                "actual_arrival": _from_snapshot(0),
                 "cumulative_wait_min": 0,
                 "delay_min": 0,
             })
@@ -298,14 +298,15 @@ def _envelope(name: str, buses: list[dict],
     """
     Wrap buses in the full scenario JSON structure.
 
-    NOTE: weights in the JSON are informational only. The solver uses
-    GLOBAL_WEIGHTS from solver.py. We keep the key in the file so a
-    human reading the JSON understands the intent, but the app ignores it.
+    Weights are defined directly here. To change them for ALL scenarios,
+    edit the dict below and re-run generate_scenarios.py. To change for
+    ONE scenario only, edit that scenario's JSON file directly after generation.
 
-    INTERVIEW: "Why keep weights in the JSON if the solver ignores them?"
-    → Good question. Options: (a) remove it for clarity, (b) use it as a
-    per-scenario override if you want that flexibility later. Right now it's
-    documentation, not configuration.
+    INTERVIEW: "How do you change weights for a specific scenario?"
+    → Edit the weights block in that scenario's JSON file directly.
+      The loader reads weights from the JSON so no code change is needed.
+    "How do you change weights globally?"
+    → Edit the weights dict in _envelope() below and re-run the generator.
     """
     chargers = chargers or {s: 2 for s in ["A", "B", "C", "D"]}
     return {
@@ -313,7 +314,12 @@ def _envelope(name: str, buses: list[dict],
         "snapshot_time": SNAPSHOT,
         "charge_minutes": CHARGE,
         "travel_minutes_per_leg": TRAVEL,
-        "weights": {"note": "ignored by solver — see GLOBAL_WEIGHTS in solver.py"},
+        "weights": {
+            "individual": 1.5,
+            "operator": 1.0,
+            "network": 0.5,
+            "intra_operator_priority": 0.8,
+        },
         "stations": {s: {"chargers": c} for s, c in chargers.items()},
         "buses": buses,
     }
@@ -338,22 +344,78 @@ def scenario_1_baseline() -> dict:
 
 def scenario_2_traffic_block() -> dict:
     """
-    SCENARIO 2 — Traffic block between B and C (both directions).
-    +30 min on the B<->C leg for every bus.
-    Expected result: wave of delayed buses hitting C (for A->D) and B
-    (for D->A) later than normal → contention at those stations.
-    The scheduler should stack them efficiently, not in a panic.
+    SCENARIO 2 — Traffic block between B and C, gradually clearing after 22:00.
+
+    TRAFFIC MODEL:
+      Peak delay   : +30 min at snapshot time (20:45) with ±20% random noise
+      Decay window : 20:45 → 22:00 (75 min). Delay drops linearly to 0.
+      After 22:00  : only small residual noise (±3 min) — traffic has cleared.
+
+    WHY GRADUAL?
+      Uniform +30 min for every bus means they all spread out equally →
+      zero contention (the previous bug). Gradual clearing means early buses
+      (crossing B↔C near 20:45) get hit hard, while later buses cross freely.
+      This creates a wave of delayed buses that then catches up with the
+      on-time buses ahead → real contention at B and C.
+
+    HOW IT WORKS:
+      perturb() receives the bus's SCHEDULED departure from the B↔C origin
+      station (pre-computed as sched_bc_offsets[i]).
+      decay_factor = max(0, 1 - sched_offset / CLEAR_WINDOW)
+        = 1.0 at snapshot, 0.0 at 22:00, stays 0 after.
+      actual_delay = BASE_DELAY * decay_factor * random(0.8, 1.2)
+
+    INTERVIEW: "Why does perturb need the scheduled time?"
+      The perturbation must depend on WHEN the bus crosses the block, not
+      just which bus it is. Two buses on the same leg but at different times
+      experience different congestion levels. We pre-compute each bus's
+      scheduled B↔C crossing time and pass it through the closure.
     """
+    BASE_DELAY   = 30    # minutes delay at peak
+    CLEAR_WINDOW = 75    # minutes after snapshot when traffic fully clears (22:00)
+    NOISE        = 0.20  # ±20% randomness on delay
+    RESIDUAL     = 3     # small noise (min) after traffic clears
+
+    rng = random.Random(2)
     starts = _staggered_starts(40, seed=2)
-    dirs = _alternating_directions()
+    dirs   = _alternating_directions()
+
+    # Pre-compute each bus's scheduled arrival at the START of the B↔C leg.
+    # A->D: departs B (= arrives B + CHARGE). D->A: departs C (= arrives C + CHARGE).
+    # We use the nominal (unperturbed) schedule: start + leg_offsets.
+    sched_bc_offsets = []
+    for i in range(40):
+        direction = dirs[i]
+        route = ROUTE if direction == "A->D" else list(reversed(ROUTE))
+        # Walk route to find when bus DEPARTS the B↔C origin station
+        t = starts[i]
+        bc_depart = None
+        for idx, station in enumerate(route):
+            if idx < len(route) - 1:
+                next_st = route[idx + 1]
+                if {station, next_st} == {"B", "C"}:
+                    bc_depart = t + CHARGE   # departs after charging here
+                    break
+                t += CHARGE + TRAVEL
+        sched_bc_offsets.append(bc_depart if bc_depart is not None else 0)
 
     def perturb(i, a, b):
-        if {a, b} == {"B", "C"}:
-            return 30   # both B->C and C->B are slow
-        return 0
+        if {a, b} != {"B", "C"}:
+            return 0
+        sched_offset = sched_bc_offsets[i]  # minutes from snapshot
+        # Linear decay: 1.0 at snapshot (offset=0), 0.0 at CLEAR_WINDOW (offset=75).
+        # Clamp to [0, 1]: buses already past B<->C (negative offset) get full
+        # peak delay (they were in the thick of it). Buses after clear window get 0.
+        decay = max(0.0, min(1.0, 1.0 - sched_offset / CLEAR_WINDOW))
+        if decay <= 0:
+            # Traffic cleared — just small residual noise
+            return rng.randint(-RESIDUAL, RESIDUAL)
+        # Peak-to-zero linear decay with ±20% noise
+        noise_factor = 1.0 + rng.uniform(-NOISE, NOISE)
+        return int(round(BASE_DELAY * decay * noise_factor))
 
     buses = _make_fleet("s2", starts, dirs, perturb)
-    return _envelope("Scenario 2 - Traffic block between B and C", buses)
+    return _envelope("Scenario 2 - Traffic block between B and C (gradual clearing)", buses)
 
 
 def scenario_3_late_starters() -> dict:

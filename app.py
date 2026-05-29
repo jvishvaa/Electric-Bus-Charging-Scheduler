@@ -30,7 +30,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from scheduler.loader import list_scenarios, load_scenario, GLOBAL_WEIGHTS
+import time
+from scheduler.loader import list_scenarios, load_scenario
 from scheduler.model import Scenario
 from scheduler.solver import ChargingSlot, Schedule, solve
 
@@ -54,14 +55,18 @@ def _hhmm(snapshot: str, minutes_offset: int) -> str:
 # ──────────────────────────────────────────────
 
 @st.cache_data(show_spinner="Solving scheduling problem…")
-def _solve_cached(scenario_path: str) -> tuple[Scenario, Schedule]:
+def _solve_cached(scenario_path: str) -> tuple[Scenario, Schedule, float]:
     """
     Cache keyed on scenario_path string. The solver only runs when a new
     scenario is selected. Streamlit reruns this function if the cache key
     changes (i.e. different scenario picked).
+    Returns (scenario, schedule, solve_time_seconds).
     """
     s = load_scenario(scenario_path)
-    return s, solve(s, time_limit_s=20.0)
+    t0 = time.time()
+    sched = solve(s, time_limit_s=20.0)
+    solve_time = round(time.time() - t0, 2)
+    return s, sched, solve_time
 
 
 # ──────────────────────────────────────────────
@@ -108,12 +113,11 @@ def _render_scenario_view(scenario: Scenario) -> None:
 
         # Weights (global)
         st.caption(
-            f"**Global weights** — "
-            f"individual: `{GLOBAL_WEIGHTS.individual}` · "
-            f"operator: `{GLOBAL_WEIGHTS.operator}` · "
-            f"network: `{GLOBAL_WEIGHTS.network}` · "
-            f"delay: `{GLOBAL_WEIGHTS.delay}` · "
-            f"intra_operator_priority: `{GLOBAL_WEIGHTS.intra_operator_priority}`"
+            f"**Weights (from scenario file)** — "
+            f"individual: `{scenario.weights.individual}` · "
+            f"operator: `{scenario.weights.operator}` · "
+            f"network: `{scenario.weights.network}` · "
+            f"intra-operator priority: `{scenario.weights.intra_operator_priority}`"
         )
 
         # Station configs
@@ -126,7 +130,7 @@ def _render_scenario_view(scenario: Scenario) -> None:
         rows = []
         for b in scenario.buses:
             upcoming_str = " → ".join(
-                f"{u.station}@{_hhmm(scenario.snapshot_time, u.earliest_arrival_min)}"
+                f"{u.station}@{_hhmm(scenario.snapshot_time, u.actual_arrival_min)}"
                 + (
                     f" (sched {_hhmm(scenario.snapshot_time, u.scheduled_arrival_min)})"
                     if u.delay_min != 0 else ""
@@ -147,16 +151,17 @@ def _render_scenario_view(scenario: Scenario) -> None:
         st.json(scenario.raw)
 
 
-def _render_summary(scenario: Scenario, sched: Schedule) -> None:
+def _render_summary(scenario: Scenario, sched: Schedule, solve_time: float) -> None:
     """
     High-level metrics about the solved schedule.
     INTERVIEW: "Show total wait per operator" → this is it.
     """
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Solver status", sched.status)
     c2.metric("Total wait (all buses)", f"{sched.total_wait_min} min")
     c3.metric("Avg wait per bus", f"{sched.total_wait_min / max(len(scenario.buses), 1):.1f} min")
     c4.metric("Objective value", f"{sched.objective:,.0f}")
+    c5.metric("Solve time", f"{solve_time}s", help="Cached after first run — re-selecting same scenario shows 0s")
 
     # Per-operator wait breakdown
     op_waits = sched.total_wait_by_operator()
@@ -200,7 +205,7 @@ def _render_station(station: str, scenario: Scenario, sched: Schedule) -> None:
             "bus":          slot.bus_id,
             "operator":     slot.operator,
             "direction":    slot.direction,
-            "arrives":      _hhmm(scenario.snapshot_time, slot.earliest_arrival_min),
+            "arrives":      _hhmm(scenario.snapshot_time, slot.actual_arrival_min),
             "sched arrival":_hhmm(scenario.snapshot_time, slot.scheduled_arrival_min),
             "charge start": _hhmm(scenario.snapshot_time, slot.start_min),
             "charge end":   _hhmm(scenario.snapshot_time, slot.end_min),
@@ -232,7 +237,7 @@ def main() -> None:
         format_func=lambda s: s.replace("_", " ").replace("scenario ", "Scenario ").title(),
     )
 
-    scenario, sched = _solve_cached(str(name_to_path[pick]))
+    scenario, sched, solve_time = _solve_cached(str(name_to_path[pick]))
 
     st.divider()
     st.markdown("### 📂 Scenario data")
@@ -240,7 +245,7 @@ def main() -> None:
 
     st.divider()
     st.markdown("### 📊 Schedule summary")
-    _render_summary(scenario, sched)
+    _render_summary(scenario, sched, solve_time)
 
     st.divider()
     st.markdown("### ⚡ Charging order by station")

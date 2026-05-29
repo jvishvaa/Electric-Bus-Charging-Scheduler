@@ -4,9 +4,10 @@
   "charge_minutes": 15,
   "travel_minutes_per_leg": 150,
   "weights": {
-    "individual": 2.0,
+    "individual": 1.5,
     "operator": 1.0,
-    "network": 1.0
+    "network": 0.5,
+    "intra_operator_priority": 0.8
   },
   "stations": {
     "A": {
@@ -34,7 +35,9 @@
         {
           "station": "D",
           "scheduled_arrival": "22:57",
-          "earliest_arrival": "22:57"
+          "actual_arrival": "22:57",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -49,7 +52,9 @@
         {
           "station": "A",
           "scheduled_arrival": "23:10",
-          "earliest_arrival": "22:34"
+          "actual_arrival": "22:34",
+          "cumulative_wait_min": 0,
+          "delay_min": -36
         }
       ]
     },
@@ -64,7 +69,9 @@
         {
           "station": "D",
           "scheduled_arrival": "23:19",
-          "earliest_arrival": "23:19"
+          "actual_arrival": "23:19",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ],
       "charging_at": "C",
@@ -81,12 +88,16 @@
         {
           "station": "B",
           "scheduled_arrival": "20:56",
-          "earliest_arrival": "20:56"
+          "actual_arrival": "20:56",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "23:41",
-          "earliest_arrival": "23:41"
+          "actual_arrival": "23:41",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -101,7 +112,9 @@
         {
           "station": "D",
           "scheduled_arrival": "23:48",
-          "earliest_arrival": "23:09"
+          "actual_arrival": "23:09",
+          "cumulative_wait_min": 0,
+          "delay_min": -39
         }
       ],
       "charging_at": "C",
@@ -118,12 +131,16 @@
         {
           "station": "B",
           "scheduled_arrival": "21:16",
-          "earliest_arrival": "20:52"
+          "actual_arrival": "20:52",
+          "cumulative_wait_min": 0,
+          "delay_min": -24
         },
         {
           "station": "A",
           "scheduled_arrival": "00:01",
-          "earliest_arrival": "23:26"
+          "actual_arrival": "23:26",
+          "cumulative_wait_min": 0,
+          "delay_min": -35
         }
       ]
     },
@@ -138,12 +155,16 @@
         {
           "station": "C",
           "scheduled_arrival": "21:23",
-          "earliest_arrival": "21:01"
+          "actual_arrival": "21:01",
+          "cumulative_wait_min": 0,
+          "delay_min": -22
         },
         {
           "station": "D",
           "scheduled_arrival": "00:08",
-          "earliest_arrival": "23:35"
+          "actual_arrival": "23:35",
+          "cumulative_wait_min": 0,
+          "delay_min": -33
         }
       ]
     },
@@ -158,12 +179,16 @@
         {
           "station": "B",
           "scheduled_arrival": "21:34",
-          "earliest_arrival": "21:34"
+          "actual_arrival": "21:34",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "00:19",
-          "earliest_arrival": "00:19"
+          "actual_arrival": "00:19",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -178,12 +203,16 @@
         {
           "station": "C",
           "scheduled_arrival": "21:46",
-          "earliest_arrival": "21:46"
+          "actual_arrival": "21:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "00:31",
-          "earliest_arrival": "00:31"
+          "actual_arrival": "00:31",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -198,12 +227,16 @@
         {
           "station": "B",
           "scheduled_arrival": "21:57",
-          "earliest_arrival": "21:32"
+          "actual_arrival": "21:32",
+          "cumulative_wait_min": 0,
+          "delay_min": -25
         },
         {
           "station": "A",
           "scheduled_arrival": "00:42",
-          "earliest_arrival": "00:05"
+          "actual_arrival": "00:05",
+          "cumulative_wait_min": 0,
+          "delay_min": -37
         }
       ]
     },
@@ -218,12 +251,16 @@
         {
           "station": "C",
           "scheduled_arrival": "22:15",
-          "earliest_arrival": "22:15"
+          "actual_arrival": "22:15",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "01:00",
-          "earliest_arrival": "01:00"
+          "actual_arrival": "01:00",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -238,12 +275,16 @@
         {
           "station": "B",
           "scheduled_arrival": "22:29",
-          "earliest_arrival": "22:29"
+          "actual_arrival": "22:29",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "01:14",
-          "earliest_arrival": "01:14"
+          "actual_arrival": "01:14",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -258,12 +299,16 @@
         {
           "station": "C",
           "scheduled_arrival": "22:37",
-          "earliest_arrival": "22:14"
+          "actual_arrival": "22:14",
+          "cumulative_wait_min": 0,
+          "delay_min": -23
         },
         {
           "station": "D",
           "scheduled_arrival": "01:22",
-          "earliest_arrival": "00:48"
+          "actual_arrival": "00:48",
+          "cumulative_wait_min": 0,
+          "delay_min": -34
         }
       ]
     },
@@ -278,12 +323,16 @@
         {
           "station": "B",
           "scheduled_arrival": "22:57",
-          "earliest_arrival": "22:57"
+          "actual_arrival": "22:57",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "01:42",
-          "earliest_arrival": "01:42"
+          "actual_arrival": "01:42",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -298,12 +347,16 @@
         {
           "station": "C",
           "scheduled_arrival": "23:09",
-          "earliest_arrival": "23:09"
+          "actual_arrival": "23:09",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "01:54",
-          "earliest_arrival": "01:54"
+          "actual_arrival": "01:54",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -318,12 +371,16 @@
         {
           "station": "B",
           "scheduled_arrival": "23:09",
-          "earliest_arrival": "22:45"
+          "actual_arrival": "22:45",
+          "cumulative_wait_min": 0,
+          "delay_min": -24
         },
         {
           "station": "A",
           "scheduled_arrival": "01:54",
-          "earliest_arrival": "01:15"
+          "actual_arrival": "01:15",
+          "cumulative_wait_min": 0,
+          "delay_min": -39
         }
       ]
     },
@@ -338,12 +395,16 @@
         {
           "station": "C",
           "scheduled_arrival": "23:24",
-          "earliest_arrival": "23:24"
+          "actual_arrival": "23:24",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "02:09",
-          "earliest_arrival": "02:09"
+          "actual_arrival": "02:09",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ],
       "charging_at": "B",
@@ -360,17 +421,23 @@
         {
           "station": "C",
           "scheduled_arrival": "20:56",
-          "earliest_arrival": "20:56"
+          "actual_arrival": "20:56",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "23:41",
-          "earliest_arrival": "23:41"
+          "actual_arrival": "23:41",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "02:26",
-          "earliest_arrival": "02:26"
+          "actual_arrival": "02:26",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -385,17 +452,23 @@
         {
           "station": "B",
           "scheduled_arrival": "21:08",
-          "earliest_arrival": "21:08"
+          "actual_arrival": "21:08",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "23:53",
-          "earliest_arrival": "23:53"
+          "actual_arrival": "23:53",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "02:38",
-          "earliest_arrival": "02:38"
+          "actual_arrival": "02:38",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -410,17 +483,23 @@
         {
           "station": "C",
           "scheduled_arrival": "21:17",
-          "earliest_arrival": "21:02"
+          "actual_arrival": "21:02",
+          "cumulative_wait_min": 0,
+          "delay_min": -15
         },
         {
           "station": "B",
           "scheduled_arrival": "00:02",
-          "earliest_arrival": "23:35"
+          "actual_arrival": "23:35",
+          "cumulative_wait_min": 0,
+          "delay_min": -27
         },
         {
           "station": "A",
           "scheduled_arrival": "02:47",
-          "earliest_arrival": "02:10"
+          "actual_arrival": "02:10",
+          "cumulative_wait_min": 0,
+          "delay_min": -37
         }
       ]
     },
@@ -435,17 +514,23 @@
         {
           "station": "B",
           "scheduled_arrival": "21:28",
-          "earliest_arrival": "21:28"
+          "actual_arrival": "21:28",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "00:13",
-          "earliest_arrival": "00:13"
+          "actual_arrival": "00:13",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "02:58",
-          "earliest_arrival": "02:58"
+          "actual_arrival": "02:58",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -460,17 +545,23 @@
         {
           "station": "C",
           "scheduled_arrival": "21:48",
-          "earliest_arrival": "21:48"
+          "actual_arrival": "21:48",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "00:33",
-          "earliest_arrival": "00:33"
+          "actual_arrival": "00:33",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "03:18",
-          "earliest_arrival": "03:18"
+          "actual_arrival": "03:18",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -485,17 +576,23 @@
         {
           "station": "B",
           "scheduled_arrival": "21:50",
-          "earliest_arrival": "21:50"
+          "actual_arrival": "21:50",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "00:35",
-          "earliest_arrival": "00:35"
+          "actual_arrival": "00:35",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "03:20",
-          "earliest_arrival": "03:20"
+          "actual_arrival": "03:20",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -510,17 +607,23 @@
         {
           "station": "C",
           "scheduled_arrival": "22:01",
-          "earliest_arrival": "22:01"
+          "actual_arrival": "22:01",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "00:46",
-          "earliest_arrival": "00:46"
+          "actual_arrival": "00:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "03:31",
-          "earliest_arrival": "03:31"
+          "actual_arrival": "03:31",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -535,17 +638,23 @@
         {
           "station": "B",
           "scheduled_arrival": "22:16",
-          "earliest_arrival": "22:16"
+          "actual_arrival": "22:16",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "01:01",
-          "earliest_arrival": "01:01"
+          "actual_arrival": "01:01",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "03:46",
-          "earliest_arrival": "03:46"
+          "actual_arrival": "03:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -560,17 +669,23 @@
         {
           "station": "C",
           "scheduled_arrival": "22:27",
-          "earliest_arrival": "22:13"
+          "actual_arrival": "22:13",
+          "cumulative_wait_min": 0,
+          "delay_min": -14
         },
         {
           "station": "B",
           "scheduled_arrival": "01:12",
-          "earliest_arrival": "00:46"
+          "actual_arrival": "00:46",
+          "cumulative_wait_min": 0,
+          "delay_min": -26
         },
         {
           "station": "A",
           "scheduled_arrival": "03:57",
-          "earliest_arrival": "03:16"
+          "actual_arrival": "03:16",
+          "cumulative_wait_min": 0,
+          "delay_min": -41
         }
       ]
     },
@@ -585,17 +700,23 @@
         {
           "station": "B",
           "scheduled_arrival": "22:36",
-          "earliest_arrival": "22:36"
+          "actual_arrival": "22:36",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "01:21",
-          "earliest_arrival": "01:21"
+          "actual_arrival": "01:21",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "04:06",
-          "earliest_arrival": "04:06"
+          "actual_arrival": "04:06",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -610,17 +731,23 @@
         {
           "station": "C",
           "scheduled_arrival": "22:58",
-          "earliest_arrival": "22:58"
+          "actual_arrival": "22:58",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "01:43",
-          "earliest_arrival": "01:43"
+          "actual_arrival": "01:43",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "04:28",
-          "earliest_arrival": "04:28"
+          "actual_arrival": "04:28",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -635,17 +762,23 @@
         {
           "station": "B",
           "scheduled_arrival": "23:12",
-          "earliest_arrival": "23:12"
+          "actual_arrival": "23:12",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "01:57",
-          "earliest_arrival": "01:57"
+          "actual_arrival": "01:57",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "04:42",
-          "earliest_arrival": "04:42"
+          "actual_arrival": "04:42",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -660,17 +793,23 @@
         {
           "station": "C",
           "scheduled_arrival": "23:16",
-          "earliest_arrival": "23:16"
+          "actual_arrival": "23:16",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "02:01",
-          "earliest_arrival": "02:01"
+          "actual_arrival": "02:01",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "04:46",
-          "earliest_arrival": "04:46"
+          "actual_arrival": "04:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ],
       "charging_at": "D",
@@ -687,22 +826,30 @@
         {
           "station": "A",
           "scheduled_arrival": "20:51",
-          "earliest_arrival": "20:51"
+          "actual_arrival": "20:51",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "23:36",
-          "earliest_arrival": "23:23"
+          "actual_arrival": "23:23",
+          "cumulative_wait_min": 0,
+          "delay_min": -13
         },
         {
           "station": "C",
           "scheduled_arrival": "02:21",
-          "earliest_arrival": "01:54"
+          "actual_arrival": "01:54",
+          "cumulative_wait_min": 0,
+          "delay_min": -27
         },
         {
           "station": "D",
           "scheduled_arrival": "05:06",
-          "earliest_arrival": "04:28"
+          "actual_arrival": "04:28",
+          "cumulative_wait_min": 0,
+          "delay_min": -38
         }
       ]
     },
@@ -717,22 +864,30 @@
         {
           "station": "D",
           "scheduled_arrival": "20:55",
-          "earliest_arrival": "20:55"
+          "actual_arrival": "20:55",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "23:40",
-          "earliest_arrival": "23:40"
+          "actual_arrival": "23:40",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "02:25",
-          "earliest_arrival": "02:25"
+          "actual_arrival": "02:25",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "05:10",
-          "earliest_arrival": "05:10"
+          "actual_arrival": "05:10",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -747,22 +902,30 @@
         {
           "station": "A",
           "scheduled_arrival": "21:06",
-          "earliest_arrival": "21:06"
+          "actual_arrival": "21:06",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "23:51",
-          "earliest_arrival": "23:51"
+          "actual_arrival": "23:51",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "02:36",
-          "earliest_arrival": "02:36"
+          "actual_arrival": "02:36",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "05:21",
-          "earliest_arrival": "05:21"
+          "actual_arrival": "05:21",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -777,22 +940,30 @@
         {
           "station": "D",
           "scheduled_arrival": "21:17",
-          "earliest_arrival": "21:17"
+          "actual_arrival": "21:17",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "00:02",
-          "earliest_arrival": "00:02"
+          "actual_arrival": "00:02",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "02:47",
-          "earliest_arrival": "02:47"
+          "actual_arrival": "02:47",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "05:32",
-          "earliest_arrival": "05:32"
+          "actual_arrival": "05:32",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -807,22 +978,30 @@
         {
           "station": "A",
           "scheduled_arrival": "21:31",
-          "earliest_arrival": "21:31"
+          "actual_arrival": "21:31",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "00:16",
-          "earliest_arrival": "00:16"
+          "actual_arrival": "00:16",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "03:01",
-          "earliest_arrival": "03:01"
+          "actual_arrival": "03:01",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "05:46",
-          "earliest_arrival": "05:46"
+          "actual_arrival": "05:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -837,22 +1016,30 @@
         {
           "station": "D",
           "scheduled_arrival": "21:43",
-          "earliest_arrival": "21:43"
+          "actual_arrival": "21:43",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "00:28",
-          "earliest_arrival": "00:28"
+          "actual_arrival": "00:28",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "03:13",
-          "earliest_arrival": "03:13"
+          "actual_arrival": "03:13",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "05:58",
-          "earliest_arrival": "05:58"
+          "actual_arrival": "05:58",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -867,22 +1054,30 @@
         {
           "station": "A",
           "scheduled_arrival": "22:01",
-          "earliest_arrival": "22:01"
+          "actual_arrival": "22:01",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "00:46",
-          "earliest_arrival": "00:46"
+          "actual_arrival": "00:46",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "03:31",
-          "earliest_arrival": "03:31"
+          "actual_arrival": "03:31",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "06:16",
-          "earliest_arrival": "06:16"
+          "actual_arrival": "06:16",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -897,22 +1092,30 @@
         {
           "station": "D",
           "scheduled_arrival": "22:14",
-          "earliest_arrival": "22:14"
+          "actual_arrival": "22:14",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "00:59",
-          "earliest_arrival": "00:59"
+          "actual_arrival": "00:59",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "03:44",
-          "earliest_arrival": "03:44"
+          "actual_arrival": "03:44",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "06:29",
-          "earliest_arrival": "06:29"
+          "actual_arrival": "06:29",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -927,22 +1130,30 @@
         {
           "station": "A",
           "scheduled_arrival": "22:20",
-          "earliest_arrival": "22:20"
+          "actual_arrival": "22:20",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "01:05",
-          "earliest_arrival": "01:05"
+          "actual_arrival": "01:05",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "03:50",
-          "earliest_arrival": "03:50"
+          "actual_arrival": "03:50",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "D",
           "scheduled_arrival": "06:35",
-          "earliest_arrival": "06:35"
+          "actual_arrival": "06:35",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     },
@@ -957,22 +1168,30 @@
         {
           "station": "D",
           "scheduled_arrival": "22:28",
-          "earliest_arrival": "22:28"
+          "actual_arrival": "22:28",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "C",
           "scheduled_arrival": "01:13",
-          "earliest_arrival": "01:13"
+          "actual_arrival": "01:13",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "B",
           "scheduled_arrival": "03:58",
-          "earliest_arrival": "03:58"
+          "actual_arrival": "03:58",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         },
         {
           "station": "A",
           "scheduled_arrival": "06:43",
-          "earliest_arrival": "06:43"
+          "actual_arrival": "06:43",
+          "cumulative_wait_min": 0,
+          "delay_min": 0
         }
       ]
     }

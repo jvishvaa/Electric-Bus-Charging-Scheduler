@@ -53,13 +53,6 @@ from .model import Bus, Scenario, StationConfig, UpcomingStop, Weights
 # "What happens if operator is very high?" → Solver balances across operators
 #   even if that increases individual waits.
 # ──────────────────────────────────────────────────────
-GLOBAL_WEIGHTS = Weights(
-    individual=1.5,
-    operator=1.0,
-    network=0.5,
-    delay=0.0,
-    intra_operator_priority=0.7,
-)
 
 
 def _hhmm_to_min(snapshot: str, hhmm: str) -> int:
@@ -92,7 +85,7 @@ def load_scenario(path: str | Path) -> Scenario:
     2. cumulative_wait_min is read from the JSON (generator sets it to 0;
        after the solver runs we could write it back, but we don't yet).
     3. delay_min in the JSON is purely informational. We recompute it from
-       earliest_arrival - scheduled_arrival to be safe (in case of rounding).
+       actual_arrival - scheduled_arrival to be safe (in case of rounding).
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     snapshot = raw["snapshot_time"]
@@ -110,13 +103,13 @@ def load_scenario(path: str | Path) -> Scenario:
         upcoming_stops: list[UpcomingStop] = []
         for u in b.get("upcoming", []):
             sched_min = _hhmm_to_min(snapshot, u["scheduled_arrival"])
-            earliest_min = _hhmm_to_min(snapshot, u["earliest_arrival"])
+            actual_min = _hhmm_to_min(snapshot, u["actual_arrival"])
             # delay_min: positive = late, negative = early
-            delay_min = earliest_min - sched_min
+            delay_min = actual_min - sched_min
             upcoming_stops.append(UpcomingStop(
                 station=u["station"],
                 scheduled_arrival_min=sched_min,
-                earliest_arrival_min=earliest_min,
+                actual_arrival_min=actual_min,
                 cumulative_wait_min=int(u.get("cumulative_wait_min", 0)),
                 delay_min=delay_min,
             ))
@@ -147,7 +140,12 @@ def load_scenario(path: str | Path) -> Scenario:
         charge_minutes=int(raw.get("charge_minutes", 15)),
         travel_minutes_per_leg=int(raw.get("travel_minutes_per_leg", 150)),
         stations=stations,
-        weights=GLOBAL_WEIGHTS,   # ← global constant, not from file
+        weights=Weights(
+            individual=float(raw["weights"]["individual"]),
+            operator=float(raw["weights"]["operator"]),
+            network=float(raw["weights"]["network"]),
+            intra_operator_priority=float(raw["weights"]["intra_operator_priority"])
+        ),
         buses=tuple(buses),
         raw=raw,                  # keep original for UI "Raw JSON" tab
     )

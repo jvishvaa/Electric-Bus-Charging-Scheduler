@@ -22,7 +22,7 @@ INTERVIEW HOT SPOTS:
   - "What is cumulative_wait_min?" → it's the total wait this bus has
     already endured at earlier stations. Lets us penalise further delay
     for a bus that's already been unlucky.
-  - "What is delay_min?" → earliest_arrival - scheduled_arrival.
+  - "What is delay_min?" → actual_arrival - scheduled_arrival.
     Negative = running early. Positive = running late. The solver knows
     the bus *is* late but doesn't use delay as a hard constraint by default
     — you could add one (e.g. deprioritise very-late buses).
@@ -65,7 +65,7 @@ class Weights:
     network:    penalise total completion time across all buses. High =
                 scheduler tries to get everyone through the system faster.
     delay:      NEW — penalise buses that are already running late
-                (earliest_arrival > scheduled_arrival). Bumping this weight
+                 actual_arrival > scheduled_arrival). Bumping this weight
                 means late buses get priority, which is a policy choice.
 
     INTERVIEW: "Add a weight for bus priority" → add a field here, read it
@@ -74,7 +74,6 @@ class Weights:
     individual: float   # per-bus wait minimisation
     operator: float     # max-operator-wait minimisation (fairness across operators)
     network: float      # total network completion time
-    delay: float        # extra penalty for buses already running late
     intra_operator_priority: float   # Delay penalty within the operator
 
 
@@ -85,20 +84,20 @@ class UpcomingStop:
     WHAT EACH FIELD DOES FOR THE SOLVER:
       station              → which AddCumulative pool this stop belongs to
       scheduled_arrival_min → informational; used to compute delay_min
-      earliest_arrival_min  → hard lower bound: solver cannot start charging
+      actual_arrival_min  → hard lower bound: solver cannot start charging
                               before this. This is the physically possible
-                              earliest time given current position + speed.
+                              actual time given current position + speed.
       cumulative_wait_min   → how many minutes this bus has already waited
                               at previous stations on this trip. Used in the
                               objective to give relief to already-suffering buses.
-      delay_min             → earliest - scheduled (pre-computed for clarity).
+      delay_min             → actual - scheduled (pre-computed for clarity).
                               Negative means running early; positive means late.
     """
     station: str
     scheduled_arrival_min: int   # when it *should* arrive (original timetable)
-    earliest_arrival_min: int    # when it *will* arrive (reality)
+    actual_arrival_min: int    # when it *will* arrive (reality)
     cumulative_wait_min: int     # total wait already accumulated at prior stations
-    delay_min: int               # earliest_arrival - scheduled_arrival
+    delay_min: int               # actual_arrival - scheduled_arrival
 
 
 @dataclass(frozen=True)
@@ -144,7 +143,7 @@ class Scenario:
     charge_minutes: int          # how long one charge session takes
     travel_minutes_per_leg: int  # nominal travel time between adjacent stations
     stations: dict[str, StationConfig]
-    weights: Weights             # global, not from file (see NOTE above)
+    weights: Weights             # from the file
     buses: tuple[Bus, ...]
     raw: dict = field(default_factory=dict)  # original JSON for UI display
 
