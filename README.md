@@ -192,7 +192,7 @@ The `AddCumulative` constraint in `solver.py` reads `cfg.chargers` directly. Cha
 
 ---
 
-## How to run a fresh scenario from an interviewer
+## How to run a fresh scenario
 
 1. Drop the JSON file into the `scenarios/` folder
 2. Select it from the dropdown in the app

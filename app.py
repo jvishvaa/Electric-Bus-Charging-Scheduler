@@ -1,29 +1,3 @@
-"""
-app.py — Streamlit UI for the Bus Charging Scheduler.
-
-LAYOUT:
-  Top:      Scenario dropdown
-  Section 1: Scenario data (readable table + raw JSON tabs)
-  Section 2: Summary metrics (total wait, objective, operator fairness)
-  Section 3: 4 station panels (A, B, C, D) — the charging order
-
-DESIGN DECISIONS:
-  - UI does ZERO scheduling logic. It calls solve() and renders.
-  - @st.cache_data keyed on scenario file path: re-selecting same scenario
-    doesn't re-solve. Changing the scenario reruns the solver.
-  - All time display is HH:MM strings (back-converted from minutes offset).
-    Internally everything is integers; the UI layer does the conversion.
-
-INTERVIEW HOT SPOTS:
-  "Add a new column to the station table" →
-    Add a key to the `rows` dict in _render_station(). Done.
-  "Show a bar chart of wait times" →
-    Use st.bar_chart() in _render_summary() with the operator wait dict.
-  "Add a filter: show only buses from operator X" →
-    Add a sidebar selectbox for operator, filter the slots before rendering.
-  "Total wait time" → already shown via sched.total_wait_min.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -76,7 +50,6 @@ def _solve_cached(scenario_path: str) -> tuple[Scenario, Schedule, float]:
 def _render_scenario_view(scenario: Scenario) -> None:
     """
     Show the scenario data in two tabs: a readable table and raw JSON.
-    This is what the reviewer uses to verify the scenario makes sense.
     """
     tab_table, tab_json = st.tabs(["📋 Readable table", "{ } Raw JSON"])
 
@@ -153,8 +126,7 @@ def _render_scenario_view(scenario: Scenario) -> None:
 
 def _render_summary(scenario: Scenario, sched: Schedule, solve_time: float) -> None:
     """
-    High-level metrics about the solved schedule.
-    INTERVIEW: "Show total wait per operator" → this is it.
+    total wait per operator
     """
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Solver status", sched.status)
@@ -173,13 +145,9 @@ def _render_summary(scenario: Scenario, sched: Schedule, solve_time: float) -> N
 
 def _render_station(station: str, scenario: Scenario, sched: Schedule) -> None:
     """
-    Show charging order at one station.
+    Charging order at one station.
     Columns: rank, bus ID, operator, direction, arrival (HH:MM),
              charge start (HH:MM), charge end (HH:MM), curr wait, total wait, delay.
-
-    INTERVIEW: "Add a column for cumulative wait" → add "total_wait" key to rows.
-    INTERVIEW: "Highlight buses that waited > 15 min" → use st.dataframe with
-               a Styler to colour rows conditionally.
     """
     chargers = scenario.stations[station].chargers
     order = sched.order_at(station)

@@ -1,35 +1,3 @@
-"""
-loader.py — Parse a scenario JSON file into the typed model objects.
-
-WHAT THIS FILE DOES:
-  1. Reads the JSON from disk
-  2. Converts HH:MM time strings → integer minutes from snapshot
-  3. Builds typed Bus / UpcomingStop / Scenario objects
-  4. Injects GLOBAL_WEIGHTS (not from file — see model.py for why)
-
-WHY SEPARATE FROM model.py?
-  model.py is pure data types — no I/O, no parsing logic.
-  loader.py is the I/O boundary. This separation means:
-    - You can unit-test model.py with no file system
-    - You can swap JSON for YAML or a database by changing only loader.py
-
-KEY FUNCTION: _hhmm_to_min(snapshot, hhmm) → int
-  This is the trickiest piece. Scenarios span midnight (a bus starting
-  at 20:45 may charge at station D at 02:10 the next morning).
-  We can't store dates in HH:MM, so we use a ±12-hour disambiguation rule:
-  if the raw difference is > +12h, we assume "actually yesterday";
-  if < -12h, we assume "actually tomorrow".
-
-INTERVIEW HOT SPOTS:
-  "What if a scenario runs for more than 24 hours?" →
-    The ±12h rule breaks. You'd need to store a date or an explicit
-    minutes offset in the JSON. For this problem (overnight bus routes),
-    ±12h is sufficient.
-  "What if a new field is added to the JSON?" →
-    Add the parsing line here. The model.py dataclass will also need
-    the field. Loader is the only place that touches the JSON keys.
-"""
-
 from __future__ import annotations
 
 import json
@@ -37,22 +5,6 @@ from pathlib import Path
 
 from .model import Bus, Scenario, StationConfig, UpcomingStop, Weights
 
-# ──────────────────────────────────────────────────────
-# GLOBAL WEIGHTS — one constant for the whole system.
-# These are the optimal values we've tuned.
-#
-# INTERVIEW: "How did you pick these values?"
-#   individual=1.5: strong incentive to reduce per-bus wait. Most important.
-#   operator=1.0:   fairness across operators matters but less than raw wait.
-#   network=0.5:    total completion time is a tie-breaker, not a priority.
-#   delay=0.8:      buses already running late get moderate priority boost.
-#
-# "How would you change them?" → Edit the numbers below. One place.
-# "What happens if individual is very high?" → Solver aggressively minimises
-#   the single worst wait, possibly at the cost of total network efficiency.
-# "What happens if operator is very high?" → Solver balances across operators
-#   even if that increases individual waits.
-# ──────────────────────────────────────────────────────
 
 
 def _hhmm_to_min(snapshot: str, hhmm: str) -> int:
@@ -79,13 +31,7 @@ def _hhmm_to_min(snapshot: str, hhmm: str) -> int:
 def load_scenario(path: str | Path) -> Scenario:
     """
     Read a JSON file and return a fully-typed Scenario.
-
-    IMPORTANT DECISIONS HERE:
-    1. weights are IGNORED from the file — GLOBAL_WEIGHTS is used instead.
-    2. cumulative_wait_min is read from the JSON (generator sets it to 0;
-       after the solver runs we could write it back, but we don't yet).
-    3. delay_min in the JSON is purely informational. We recompute it from
-       actual_arrival - scheduled_arrival to be safe (in case of rounding).
+    
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     snapshot = raw["snapshot_time"]

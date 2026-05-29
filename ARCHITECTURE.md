@@ -46,8 +46,6 @@ Key types:
 - `Scenario` — the complete frozen network state. Holds all buses, station configs, weights, and timing parameters.
 - `Weights` — four floats controlling the objective terms.
 
-**If the interviewer says "add a field"** → start here, then update `loader.py`.
-
 ### `loader.py` — I/O boundary
 
 Only file that reads JSON. Converts HH:MM strings to integer minutes (all internal times are minutes from snapshot). Builds typed objects.
@@ -60,13 +58,9 @@ Key function: `_hhmm_to_min(snapshot, hhmm)` handles midnight wrap-around with a
 
 Builds a CP-SAT model in 5 steps, solves it, extracts results.
 
-**If the interviewer says "add a constraint"** → this is the only file to change.
-
 ### `app.py` — Display layer
 
 Calls `_solve_cached()` (cached by file path + mtime), renders results. No scheduling logic.
-
-**If the interviewer says "add a column to the table"** → add a key to the `rows` dict in `_render_station()`.
 
 ---
 

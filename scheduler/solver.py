@@ -1,53 +1,3 @@
-"""
-solver.py — CP-SAT scheduling engine.
-
-WHAT THIS FILE DOES:
-  Takes a Scenario → returns a Schedule (ordered charging slots per station).
-
-HOW CP-SAT WORKS (explain this in the interview):
-  1. Declare IntVars: "start time for bus X at station Y" (unknown integer)
-  2. Add HARD constraints: "this must always be true"
-  3. Add SOFT objective: "minimise this weighted sum"
-  4. Call solver.Solve() → it finds values for all IntVars
-
-THE 3 KEY HARD CONSTRAINTS:
-  [H1] Each charging slot has fixed duration (charge_minutes)
-  [H2] Station charger capacity: AddCumulative limits simultaneous use
-  [H3] Route precedence: bus must finish at station N before reaching N+1
-
-THE SOFT OBJECTIVE (4 terms, all minimised):
-  [S1] individual_sum:  sum of (start - actual_arrival) for every slot
-                        → minimises how long each bus waits
-  [S2] operator_max:    max of (per-operator total wait)
-                        → minimises worst-treated operator (fairness)
-  [S3] network_sum:     sum of all charging end times
-                        → minimises total completion time
-  [S4] delay_penalty:   sum of (wait * (1 + delay_factor)) for late buses
-                        → late buses get priority; early buses don't
-
-INTERVIEW: "How do you add a new constraint?"
-  Example: "No KPN bus can charge at station B before 21:00"
-  → Add this after the existing constraint blocks:
-    for bus in scenario.buses:
-        if bus.operator == 'kpn':
-            key = (bus.id, 'B')
-            if key in intervals:
-                start, _, _ = intervals[key]
-                model.Add(start >= 15)   # 15 min after snapshot = 21:00
-
-INTERVIEW: "What if you wanted to add bus priority?"
-  → Add a 'priority' field to Bus in model.py
-  → In the objective: multiply individual wait by (1 / priority) so high-
-    priority buses are penalised more for waiting, making solver prefer them.
-
-OUTPUT: Schedule
-  A dataclass containing:
-  - by_station: dict mapping station name → list of ChargingSlot
-  - total_wait_min: total wait across all buses and all stops (for UI metric)
-  - objective: raw solver objective value
-  - status: "OPTIMAL" or "FEASIBLE" (feasible = time limit hit but valid)
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -59,23 +9,10 @@ from .model import ROUTE, Bus, Scenario
 WEIGHT_SCALE = 1000   # CP-SAT requires integer coefficients; scale floats by this
 
 
-# ──────────────────────────────────────────────
-# Output types
-# ──────────────────────────────────────────────
-
 @dataclass
 class ChargingSlot:
-    """One scheduled charging session for one bus at one station.
-
-    The UI renders this. Fields:
-      start_min / end_min      → minutes from snapshot when charging starts/ends
-      actual_arrival_min     → the physical lower bound (from UpcomingStop)
-      scheduled_arrival_min    → what the timetable said
-      curr_wait_min            → how long bus waited at THIS station
-                                 = start_min - actual_arrival_min
-      cumulative_wait_min      → wait at prior stations (from input data) +
-                                 curr_wait_min (to show total journey wait)
-      delay_min                → actual - scheduled (negative=early, positive=late)
+    """
+    One scheduled charging session for one bus at one station.
     """
     bus_id: str
     operator: str
@@ -86,7 +23,7 @@ class ChargingSlot:
     actual_arrival_min: int
     scheduled_arrival_min: int
     cumulative_wait_min: int   # wait accumulated at previous stations
-    delay_min: int             # earliest - scheduled for this stop
+    delay_min: int             # actual - scheduled for this stop
 
     @property
     def curr_wait_min(self) -> int:
@@ -101,14 +38,9 @@ class ChargingSlot:
 
 @dataclass
 class Schedule:
-    """Full solver output.
-
-    INTERVIEW: "What is the difference between objective and total_wait_min?"
-      objective = the raw number CP-SAT minimised (scaled, includes all
-                  weighted terms mixed together — not human-readable).
-      total_wait_min = plain sum of actual wait times across all slots.
-                       Human-readable. Useful for comparing scenarios.
-    """
+    
+    """Full solver output."""
+    
     by_station: dict[str, list[ChargingSlot]]
     total_wait_min: int          # sum of curr_wait_min across all slots
     objective: float
@@ -127,54 +59,24 @@ class Schedule:
         return result
 
 
-# ──────────────────────────────────────────────
-# Main solver function
-# ──────────────────────────────────────────────
-
 def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
     """
     Build the CP-SAT model and solve it.
-
-    WALK-THROUGH (tell this story in the interview):
-
-    Step 1 — Compute time horizon
-      We need an upper bound for all IntVars. If the horizon is too small,
-      CP-SAT can't fit all buses. If too large, the search space blows up.
-      We set it to: latest_possible_arrival + charge * (n_buses + 1) + buffer.
-
-    Step 2 — Create interval variables
-      For each (bus, upcoming_stop), create:
-        start: IntVar — when charging begins
-        end:   IntVar — when charging ends (= start + charge_minutes, fixed)
-        iv:    IntervalVar — a CP-SAT object that "occupies" a time slot
-      If a bus is currently charging, we create FIXED intervals (constants)
-      so that charger slot is already occupied at snapshot time.
-
-    Step 3 — Hard constraints
-      H1: IntervalVar has fixed duration (built into NewIntervalVar)
-      H2: AddCumulative per station — total simultaneous use ≤ chargers
-      H3: Route precedence — start[bus, station_i+1] ≥ end[bus, station_i] + travel
-
-    Step 4 — Soft objective
-      Four weighted terms, scaled to ints for CP-SAT.
-
-    Step 5 — Solve and extract
-      Read solver.Value(start) for each variable to get the actual schedule.
     """
+    
     model = cp_model.CpModel()
     charge = scenario.charge_minutes
     travel = scenario.travel_minutes_per_leg
 
-    # ── Step 1: Compute time horizon ──────────────────────────────────────
     # actual: the minimum time in our system (could be negative if buses
     # started charging before snapshot)
-    earliest_times = [0]
+    actual_times = [0]
     for bus in scenario.buses:
         if bus.charging_started_min is not None:
-            earliest_times.append(bus.charging_started_min)
+            actual_times.append(bus.charging_started_min)
         for stop in bus.upcoming:
-            earliest_times.append(stop.actual_arrival_min)
-    earliest = min(earliest_times)
+            actual_times.append(stop.actual_arrival_min)
+    actual = min(actual_times)
 
     latest_times = [u.actual_arrival_min for b in scenario.buses for u in b.upcoming]
     latest_arrival = max(latest_times) if latest_times else 0
@@ -182,7 +84,6 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
     # Upper bound: worst case = every bus queues behind every other at same station
     horizon = latest_arrival + charge * (len(scenario.buses) + 2) + 120
 
-    # ── Step 2: Create interval variables ─────────────────────────────────
     # intervals[(bus_id, station)] = (start_var, end_var, interval_var)
     intervals: dict[tuple[str, str], tuple] = {}
 
@@ -213,23 +114,20 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
                 prev_end = end_var
                 continue
 
-            start = model.NewIntVar(earliest, horizon, f"start_{bus.id}_{stop.station}")
-            end = model.NewIntVar(earliest, horizon, f"end_{bus.id}_{stop.station}")
+            start = model.NewIntVar(actual, horizon, f"start_{bus.id}_{stop.station}")
+            end = model.NewIntVar(actual, horizon, f"end_{bus.id}_{stop.station}")
             iv = model.NewIntervalVar(
                 start, charge, end,
                 f"iv_{bus.id}_{stop.station}"
             )
             intervals[key] = (start, end, iv)
 
-            # ── Hard Constraint H3a: actual physical arrival ────────────
             # Bus cannot start charging before it physically arrives.
             # This is the fundamental lower bound from the real world.
             model.Add(start >= stop.actual_arrival_min)
 
-            # ── Hard Constraint H3b: route precedence ───────────────────
             # Bus must finish at previous station AND travel before arriving here.
-            # model.Add(start >= prev_end + travel) means:
-            #   charging can only start after the previous charge ends + travel.
+
             # Combined with H3a (actual arrival), CP-SAT effectively takes
             # the max of both: start ≥ max(actual_arrival, prev_end + travel)
             if prev_end is not None:
@@ -237,12 +135,10 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
 
             prev_end = end
 
-    # ── Hard Constraint H2: charger capacity per station ──────────────────
     # AddCumulative says: at any moment in time, the total "demand" of all
     # active intervals cannot exceed "capacity" (number of chargers).
     # Each interval has demand=1 (one bus = one charger slot).
-    # INTERVIEW: "How would you model a fast charger that takes 2 slots?"
-    #   → Set demand=2 for that bus's interval. Or add a special interval type.
+
     for station, cfg in scenario.stations.items():
         station_ivs = [intervals[k][2] for k in intervals if k[1] == station]
         if not station_ivs:
@@ -250,23 +146,6 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
         demands = [1] * len(station_ivs)
         model.AddCumulative(station_ivs, demands, cfg.chargers)
 
-    # ── Step 4: Soft objective terms ──────────────────────────────────────
-    #
-    # FOUR TERMS, each measuring something distinct:
-    #
-    # S1  individual_max        : MAX wait of any single bus at any stop (minimax)
-    #     → "no one bus suffers too long"
-    #
-    # S2  op_fairness_sum       : per-operator total waits, summed as separate vars
-    #     → "no operator's fleet collectively bears all the delay"
-    #
-    # S3  network_sum           : SUM of all waits across all buses and stations
-    #     → "minimise total system-wide idle time"
-    #
-    # S4  intra_operator_sum    : within same operator at same station, if a
-    #     more-delayed bus waits MORE than a less-delayed bus — penalise that
-    #     → "within your own fleet, delayed buses get queue priority"
-    #     → compares WAITS (not start times) so only scheduler choices count
 
     w = scenario.weights
 
@@ -323,30 +202,6 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
         model.Add(op_fairness_sum == sum(per_op_vars))
 
     # S4: intra-operator wait fairness — O(n) not O(n²)
-    #
-    # Goal: within the same operator at the same station, a more-delayed bus
-    # should not wait longer than a less-delayed one.
-    #
-    # PREVIOUS APPROACH (O(n²) — too slow):
-    #   Created one violation IntVar per PAIR of buses → 300 vars for scenario 5.
-    #   Each extra var adds search complexity. Doubled solve time.
-    #
-    # CURRENT APPROACH (O(n) — one var per group):
-    #   Sort buses in each (operator, station) group by delay_min.
-    #   Compare only CONSECUTIVE pairs in sorted order.
-    #   violation_k = max(0, wait[more_delayed_k] - wait[less_delayed_k])
-    #   group_max   = max of all violation_k in the group (one AddMaxEquality)
-    #   Result: 12 vars instead of 300 for scenario 5. Same semantic.
-    #
-    # WHY CONSECUTIVE PAIRS ONLY?
-    #   If d_i > d_j > d_k (three buses sorted by delay), we check:
-    #     violation(i,j): wait_i should ≤ wait_j
-    #     violation(j,k): wait_j should ≤ wait_k
-    #   Transitivity means wait_i ≤ wait_k is enforced implicitly.
-    #   No need for the (i,k) pair — it's redundant.
-    #
-    # INTERVIEW: "Why not pairwise?" → O(n²) vars blows up the model.
-    #   Consecutive sorted pairs give the same ordering guarantee via transitivity.
 
     intra_op_group_maxes: list = []
     for (op, station), entries in op_station_groups.items():
@@ -394,14 +249,9 @@ def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
         + wp * intra_operator_sum   # within-operator delay priority
     )
 
-    # ── Step 5: Solve ─────────────────────────────────────────────────────
     # Search strategy: try assigning the SMALLEST start values first.
     # WHY: When multiple buses arrive at a station at the same time (clusters),
-    # CP-SAT faces a symmetric search space (any ordering of the cluster is
-    # equally valid). Without a hint it explores many equivalent branches.
-    # Hinting "try small values first" mimics a first-come-first-served policy
-    # as the initial guess, which is usually near-optimal and prunes the tree.
-    # INTERVIEW: "How did you speed up the solver on clustered scenarios?" → this.
+
     all_start_vars = [intervals[k][0] for k in intervals
                       if not isinstance(intervals[k][0], int)]
     if all_start_vars:
