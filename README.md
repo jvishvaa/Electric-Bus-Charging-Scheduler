@@ -1,201 +1,80 @@
 # Bus Charging Scheduler
 
-An electric bus charging scheduler built with Python, Streamlit, and Google OR-Tools CP-SAT. Given a snapshot of the bus network — where every bus is, what it's doing, where it's heading — it decides the order in which buses should charge at each station to minimise wait time and maintain fairness across operators.
-
----
+A scheduler for electric buses on the Bengaluru → A → B → C → D → Kochi route, built with Python, Streamlit, and Google OR-Tools CP-SAT. Given a list of bus departures, the scheduler decides each bus's charging plan (which stations it uses) and the order in which buses use each charger.
 
 ## The problem in one sentence
 
-Four charging stations (A → B → C → D), 40 buses travelling in both directions, 2 chargers per station. When multiple buses arrive at the same time, who charges first?
-
----
+20 buses (10 Bengaluru→Kochi, 10 Kochi→Bengaluru) share 4 charging stations along a 540 km route. Battery range is 240 km, every charge takes 25 minutes and fills to full, each station has 1 charger. Decide who charges where, and when.
 
 ## Quick start
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
-
-# 2. Scenarios are already in the repo. To regenerate them:
-python generate_scenarios.py
-
-# 3. Run the app
+python generate_scenarios.py    # only needed if you edited the generator
 streamlit run app.py
 ```
 
-Open **http://localhost:8501**, pick a scenario from the dropdown, and see the charging order at each station.
-
----
+Open <http://localhost:8501>, pick a scenario, see the schedule.
 
 ## Project structure
 
 ```
-bus_scheduler/
-│
-├── app.py                    UI — Streamlit frontend (zero scheduling logic)
-├── generate_scenarios.py     Generates the 5 scenario JSON files
+bus-charging-scheduler/
+├── app.py                      Streamlit UI (no scheduling logic)
+├── generate_scenarios.py       Emits the 5 scenario JSON files
 ├── requirements.txt
-│
-├── scenarios/                5 scenario JSON files (network snapshots)
-│   ├── scenario_1_baseline.json
-│   ├── scenario_2_traffic_block.json
-│   ├── scenario_3_late_starters.json
-│   ├── scenario_4_early_arrivals.json
-│   └── scenario_5_mixed_reality.json
-│
+├── scenarios/
+│   ├── scenario_1_even_spacing.json
+│   ├── scenario_2_bunched_start.json
+│   ├── scenario_3_asymmetric_load.json
+│   ├── scenario_4_operator_heavy.json
+│   └── scenario_5_worst_case.json
 └── scheduler/
-    ├── model.py              Pure data types — Scenario, Bus, UpcomingStop, Weights
-    ├── loader.py             Parses scenario JSON → typed model objects
-    └── solver.py             CP-SAT constraint model → returns Schedule
+    ├── model.py                Frozen dataclasses — Scenario, Bus, Route, Weights
+    ├── loader.py               JSON → typed objects
+    └── solver.py               CP-SAT model → returns Schedule
 ```
 
-Each layer has exactly one job:
-
-- `model.py` — data shapes only, no logic
-- `loader.py` — I/O only, reads JSON and builds typed objects
-- `solver.py` — scheduling logic only, no file I/O, no UI
-- `app.py` — display only, calls `solve()` and renders results
-
----
+Each layer has exactly one job. See `ARCHITECTURE.md` for details.
 
 ## The 5 scenarios
 
-| Scenario                        | What it tests                   | Total wait | Max single wait | Solve time |
-| ------------------------------- | ------------------------------- | ---------- | --------------- | ---------- |
-| 1 — Baseline                    | Clean network, no surprises     | 16 min     | 3 min           | 0.04s      |
-| 2 — Traffic block B↔C (gradual) | Delayed wave hitting B and C    | 79 min     | 8 min           | 0.20s      |
-| 3 — Late starters               | Clashing buses at every station | 170 min    | 9 min           | 1.5s       |
-| 4 — Early arrivals              | Out-of-order queue jumping      | 313 min    | 38 min          | 0.31s      |
-| 5 — Mixed reality               | Real-world messy evening        | 262 min    | 38 min          | 0.65s      |
+| # | Name | What it tests |
+|---|---|---|
+| 1 | Even spacing | Baseline — buses depart every 15 min from each end. |
+| 2 | Bunched start | Tight 8-min cluster early, then spaces out. Heavy early contention. |
+| 3 | Asymmetric load | 10 BK vs 4 KB. Uneven traffic across directions. |
+| 4 | Operator-heavy | KPN runs 8 of 10 BK buses. Operator weight = 2.0 — visible policy effect. |
+| 5 | Worst case | All 20 buses inside 72 minutes. Convergence at inner stations. |
 
-All scenarios solve to **OPTIMAL** (CP-SAT proves no better solution exists).
+## How to change the world without changing code
 
----
+Everything physical and every weight lives in the scenario JSON.
 
-## How to add a new scenario
+| To change... | Edit... |
+| --- | --- |
+| Battery range | `battery_range_km` in the JSON |
+| Charge duration | `charge_minutes` |
+| Travel speed | `speed_kmph` |
+| Add or remove a station | `route.nodes`, `route.segments`, `stations` |
+| Charger count at one station | `stations.<name>.chargers` |
+| Tune weights | `weights.individual` / `operator` / `overall` |
+| Add a bus / cancel a bus / change departure | `buses` array |
 
-1. Open `generate_scenarios.py`
-2. Copy any existing builder function and rename it:
+To use a brand-new scenario: drop a JSON file into `scenarios/`. The UI picks it up on the next reload.
 
-```python
-def scenario_6_charger_failure() -> dict:
-    """Station C drops to 1 charger — hardware fault."""
-    starts = _staggered_starts(40, seed=6)
-    dirs = _alternating_directions()
-    buses = _make_fleet("s6", starts, dirs, lambda i, a, b: 0)
-    return _envelope(
-        "Scenario 6 - Station C charger failure",
-        buses,
-        chargers={"A": 2, "B": 2, "C": 1, "D": 2}  # C down to 1
-    )
-```
+## How to add a new rule
 
-3. Add it to the `builders` dict in `main()`
-4. Run `python generate_scenarios.py`
-5. The new file appears in `scenarios/` and the UI picks it up automatically
+See **Adding a new hard rule** and **Adding a new soft rule** in `ARCHITECTURE.md` — both are 5–10 lines of Python in `solver.py`, no other file changes.
 
-**Or** drop any hand-written `scenario_*.json` file into `scenarios/` — the UI will show it without any code change.
+## How to add a new weight
 
----
+1. Add the field to `Weights` in `scheduler/model.py`.
+2. Read it in `scheduler/loader.py`.
+3. Build the matching term in `solver.py`'s `Minimize(...)`.
+4. Set the value in each scenario JSON.
 
-## How to change weights
+## What's in the doc but not modelled
 
-Weights live in `_envelope()` inside `generate_scenarios.py`. They are written into every scenario JSON when you run the generator:
-
-```python
-"weights": {
-    "individual": 1.5,              # worst single-bus wait (minimax)
-    "operator": 1.0,                # fairness across operators
-    "network": 0.5,                 # total system-wide wait
-    "intra_operator_priority": 0.8, # within-fleet delay ordering
-}
-```
-
-**Change weights for ALL scenarios:** edit the dict above, run `python generate_scenarios.py`.
-
-**Change weights for ONE scenario:** edit the `"weights"` block directly in that scenario's JSON file. The loader reads weights from the JSON at runtime — no code change needed, just reload the scenario in the app.
-
----
-
-## How to add a new constraint
-
-All constraints live in `scheduler/solver.py` in clearly marked blocks.
-
-**Hard constraint** — must always hold. Add after the `AddCumulative` block (Step 3):
-
-```python
-# Example: KPN buses cannot charge at station B before 21:00
-# 21:00 = snapshot 20:45 + 15 minutes
-for bus in scenario.buses:
-    if bus.operator == 'kpn':
-        key = (bus.id, 'B')
-        if key in intervals:
-            start, _, _ = intervals[key]
-            model.Add(start >= 15)
-```
-
-**Soft constraint** — preference, penalised but not enforced. Add a new term to `model.Minimize(...)`:
-
-```python
-# Example: penalise buses that have already waited a long time at prior stations
-burden_terms = [
-    wait_lookup[(bus.id, stop.station)]
-    for bus in scenario.buses
-    for stop in bus.upcoming
-    if stop.cumulative_wait_min > 20 and (bus.id, stop.station) in wait_lookup
-]
-burden_sum = _sum_var(burden_terms, "burden", horizon)
-w_burden = 600
-
-model.Minimize(
-    wi * individual_max
-    + wo * op_fairness_sum
-    + wn * network_sum
-    + wp * intra_operator_sum
-    + w_burden * burden_sum   # ← add this line
-)
-```
-
-See `ARCHITECTURE.md` for a full explanation of how the constraint model works.
-
----
-
-## How to change charge time or travel time
-
-Edit the values in the scenario JSON file:
-
-```json
-{
-  "charge_minutes": 15,
-  "travel_minutes_per_leg": 150
-}
-```
-
-The solver reads these directly — no code changes needed.
-
----
-
-## How to change charger counts per station
-
-Edit the scenario JSON:
-
-```json
-"stations": {
-  "A": { "chargers": 2 },
-  "B": { "chargers": 3 },
-  "C": { "chargers": 1 },
-  "D": { "chargers": 2 }
-}
-```
-
-The `AddCumulative` constraint in `solver.py` reads `cfg.chargers` directly. Change it in the JSON and reload — the solver enforces the new limit automatically.
-
----
-
-## How to run a fresh scenario
-
-1. Drop the JSON file into the `scenarios/` folder
-2. Select it from the dropdown in the app
-3. The solver runs immediately and shows the charging order
-
-The scenario file must follow the same format as the existing ones — `snapshot_time`, `stations`, `buses` with `upcoming` stops each having `scheduled_arrival`, `actual_arrival`, `delay_min`, `cumulative_wait_min`.
+- **Endpoint slow-charging** — buses always start with full range, as the doc states. We don't model the slow-charging hardware at Bengaluru/Kochi because the buses simply leave with a 240 km range.
+- **Multiple chargers per station** — the model supports it (set `chargers > 1` in the JSON, the solver switches from `NoOverlap` to `Cumulative`), but the supplied scenarios all use 1 as the doc specifies.

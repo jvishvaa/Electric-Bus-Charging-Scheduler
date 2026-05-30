@@ -1,333 +1,408 @@
+"""
+CP-SAT scheduler.
+
+The model decides, per bus, *which* charging stations to use and *when* charging
+starts at each. Hard rules (range, charger capacity, route order) are encoded as
+constraints; the soft objective is a weighted combination of three terms read
+from the scenario file.
+
+Adding a new hard rule = one `model.Add(...)` call.
+Adding a new soft term = one new variable and one entry in the `Minimize(...)`.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Iterable
 
 from ortools.sat.python import cp_model
 
-from .model import ROUTE, Bus, Scenario
-
-WEIGHT_SCALE = 1000   # CP-SAT requires integer coefficients; scale floats by this
+from .model import Bus, Scenario
 
 
-@dataclass
-class ChargingSlot:
-    """
-    One scheduled charging session for one bus at one station.
-    """
+WEIGHT_SCALE = 1000   # CP-SAT requires integer coefficients
+
+
+# ──────────────────────────────────────────────
+# Output shapes
+# ──────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class ChargeEvent:
+    """One charging session — appears in both per-bus and per-station views."""
     bus_id: str
     operator: str
     direction: str
     station: str
-    start_min: int
-    end_min: int
-    actual_arrival_min: int
-    scheduled_arrival_min: int
-    cumulative_wait_min: int   # wait accumulated at previous stations
-    delay_min: int             # actual - scheduled for this stop
+    arrive_min: int          # when bus reached the station
+    start_min: int           # when charging actually started
+    end_min: int             # = start_min + charge_minutes
+    wait_min: int            # = max(start - arrive, 0)
 
-    @property
-    def curr_wait_min(self) -> int:
-        """How long did this bus wait at this station before charging started?"""
-        return max(self.start_min - self.actual_arrival_min, 0)
 
-    @property
-    def total_wait_min(self) -> int:
-        """cumulative from prior stations + current station wait."""
-        return self.cumulative_wait_min + self.curr_wait_min
+@dataclass(frozen=True)
+class BusTimeline:
+    """The full plan for one bus, departure → arrival."""
+    bus_id: str
+    operator: str
+    direction: str
+    departure_min: int
+    arrival_at_destination_min: int
+    total_wait_min: int
+    total_charge_min: int          # sum of charge sessions (= 25 × #charges)
+    charges: tuple[ChargeEvent, ...]   # in route order
 
 
 @dataclass
 class Schedule:
-    
-    """Full solver output."""
-    
-    by_station: dict[str, list[ChargingSlot]]
-    total_wait_min: int          # sum of curr_wait_min across all slots
-    objective: float
+    """The full solver output."""
+    by_bus: dict[str, BusTimeline]
+    by_station: dict[str, list[ChargeEvent]]
     status: str
+    objective: float
+    total_wait_min: int
+    total_charge_min: int
 
-    def order_at(self, station: str) -> list[ChargingSlot]:
-        """Slots at a station sorted by start time (charging order)."""
-        return sorted(self.by_station.get(station, []), key=lambda s: s.start_min)
+    def order_at(self, station: str) -> list[ChargeEvent]:
+        """Charging order at one station — by start time."""
+        return sorted(self.by_station.get(station, []), key=lambda e: e.start_min)
 
     def total_wait_by_operator(self) -> dict[str, int]:
-        """Total wait per operator across all stations. For UI display."""
-        result: dict[str, int] = {}
-        for slots in self.by_station.values():
-            for slot in slots:
-                result[slot.operator] = result.get(slot.operator, 0) + slot.curr_wait_min
-        return result
+        out: dict[str, int] = {}
+        for tl in self.by_bus.values():
+            out[tl.operator] = out.get(tl.operator, 0) + tl.total_wait_min
+        return out
 
 
-def solve(scenario: Scenario, time_limit_s: float = 20.0) -> Schedule:
-    """
-    Build the CP-SAT model and solve it.
-    """
-    
+# ──────────────────────────────────────────────
+# Per-bus path geometry — pre-computed once before model building
+# ──────────────────────────────────────────────
+
+@dataclass
+class _BusPath:
+    """Distances and travel times along one bus's directional path."""
+    bus: Bus
+    stations: list[str]                   # inner stations in route order
+    dist_from_origin: dict[str, int]      # station name → km from origin
+    total_distance_km: int                # full origin→destination distance
+    last_station_to_destination_km: int   # km from last station to destination
+
+
+def _build_paths(scenario: Scenario) -> dict[str, _BusPath]:
+    paths: dict[str, _BusPath] = {}
+    for bus in scenario.buses:
+        nodes = scenario.route.path(bus.direction)
+        cum = 0
+        dist_from_origin: dict[str, int] = {}
+        stations: list[str] = []
+        for i, node in enumerate(nodes):
+            if i > 0:
+                cum += scenario.route.distance_between(nodes[i - 1], node)
+            if node in scenario.stations:
+                stations.append(node)
+                dist_from_origin[node] = cum
+        total = cum
+        last_to_dest = total - dist_from_origin[stations[-1]] if stations else total
+        paths[bus.id] = _BusPath(
+            bus=bus,
+            stations=stations,
+            dist_from_origin=dist_from_origin,
+            total_distance_km=total,
+            last_station_to_destination_km=last_to_dest,
+        )
+    return paths
+
+
+# ──────────────────────────────────────────────
+# Main entry point
+# ──────────────────────────────────────────────
+
+def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
     model = cp_model.CpModel()
     charge = scenario.charge_minutes
-    travel = scenario.travel_minutes_per_leg
+    R = scenario.battery_range_km
 
-    # actual: the minimum time in our system (could be negative if buses
-    # started charging before snapshot)
-    actual_times = [0]
+    paths = _build_paths(scenario)
+
+    # Time horizon: latest possible departure + worst-case full traversal +
+    # generous slack for waits in heavy contention.
+    earliest = min((b.departure_min for b in scenario.buses), default=0)
+    latest_dep = max((b.departure_min for b in scenario.buses), default=0)
+    max_total_distance = max((p.total_distance_km for p in paths.values()), default=0)
+    nominal_trip = scenario.travel_min(max_total_distance) + len(scenario.stations) * charge
+    horizon = latest_dep + nominal_trip + len(scenario.buses) * charge + 240
+
+    # ──────────────────────────────────────────
+    # Decision variables
+    # ──────────────────────────────────────────
+    x: dict[tuple[str, str], cp_model.IntVar] = {}            # presence (Bool)
+    start: dict[tuple[str, str], cp_model.IntVar] = {}        # charge start
+    end: dict[tuple[str, str], cp_model.IntVar] = {}          # charge end
+    interval: dict[tuple[str, str], cp_model.IntervalVar] = {}
+    arrive: dict[tuple[str, str], cp_model.IntVar] = {}       # arrival at station
+    leave: dict[tuple[str, str], cp_model.IntVar] = {}        # departs station
+    wait: dict[tuple[str, str], cp_model.IntVar] = {}         # wait at station
+    final_arrival: dict[str, cp_model.IntVar] = {}            # arrival at destination
+
     for bus in scenario.buses:
-        if bus.charging_started_min is not None:
-            actual_times.append(bus.charging_started_min)
-        for stop in bus.upcoming:
-            actual_times.append(stop.actual_arrival_min)
-    actual = min(actual_times)
+        bp = paths[bus.id]
+        # Origin "leave time" is just the departure — it's a fixed constant.
+        prev_leave: cp_model.IntVar = model.NewConstant(bus.departure_min)
+        prev_dist_from_origin = 0
 
-    latest_times = [u.actual_arrival_min for b in scenario.buses for u in b.upcoming]
-    latest_arrival = max(latest_times) if latest_times else 0
+        for st in bp.stations:
+            seg_km = bp.dist_from_origin[st] - prev_dist_from_origin
+            travel_to_here = scenario.travel_min(seg_km)
 
-    # Upper bound: worst case = every bus queues behind every other at same station
-    horizon = latest_arrival + charge * (len(scenario.buses) + 2) + 120
+            arr = model.NewIntVar(earliest, horizon, f"arr_{bus.id}_{st}")
+            model.Add(arr == prev_leave + travel_to_here)
 
-    # intervals[(bus_id, station)] = (start_var, end_var, interval_var)
-    intervals: dict[tuple[str, str], tuple] = {}
+            x_var = model.NewBoolVar(f"use_{bus.id}_{st}")
+            s_var = model.NewIntVar(earliest, horizon, f"st_{bus.id}_{st}")
+            e_var = model.NewIntVar(earliest, horizon, f"en_{bus.id}_{st}")
+            iv = model.NewOptionalIntervalVar(
+                s_var, charge, e_var, x_var, f"iv_{bus.id}_{st}"
+            )
 
+            # If charging here, can't start before arrival.
+            model.Add(s_var >= arr).OnlyEnforceIf(x_var)
+
+            # Wait at this station — 0 if not charging.
+            w_var = model.NewIntVar(0, horizon, f"wait_{bus.id}_{st}")
+            model.Add(w_var == s_var - arr).OnlyEnforceIf(x_var)
+            model.Add(w_var == 0).OnlyEnforceIf(x_var.Not())
+
+            # Leave time: charge end if used, else just pass through.
+            lv = model.NewIntVar(earliest, horizon, f"leave_{bus.id}_{st}")
+            model.Add(lv == e_var).OnlyEnforceIf(x_var)
+            model.Add(lv == arr).OnlyEnforceIf(x_var.Not())
+
+            x[(bus.id, st)] = x_var
+            start[(bus.id, st)] = s_var
+            end[(bus.id, st)] = e_var
+            interval[(bus.id, st)] = iv
+            arrive[(bus.id, st)] = arr
+            leave[(bus.id, st)] = lv
+            wait[(bus.id, st)] = w_var
+
+            prev_leave = lv
+            prev_dist_from_origin = bp.dist_from_origin[st]
+
+        # Final leg — last station to destination. Always traversed; no charging.
+        last_seg_min = scenario.travel_min(bp.last_station_to_destination_km)
+        fa = model.NewIntVar(earliest, horizon, f"final_arr_{bus.id}")
+        model.Add(fa == prev_leave + last_seg_min)
+        final_arrival[bus.id] = fa
+
+    # ──────────────────────────────────────────
+    # Hard rule: battery range
+    # ──────────────────────────────────────────
+    # Path indices 0..n+1 with 0=origin (always "charged"), n+1=destination.
+    # For every (i,j) with i<j and d[j]-d[i] > R, at least one of the stations
+    # strictly between (or one of i,j if they're stations) must be USED. We
+    # express this as a linear constraint with the endpoints as constants 1.
     for bus in scenario.buses:
-        prev_end = None   # tracks the end of the previous stop for precedence
+        bp = paths[bus.id]
+        n = len(bp.stations)
+        d = [0] + [bp.dist_from_origin[s] for s in bp.stations] + [bp.total_distance_km]
+        # x_path[k] for k in 1..n is the BoolVar; for k=0 and k=n+1 it's a constant 1.
+        x_path: list = [None]
+        for s in bp.stations:
+            x_path.append(x[(bus.id, s)])
+        x_path.append(None)
 
-        # If bus is currently charging: model as FIXED interval.
-        # WHY? The charger is already physically occupied. The solver must
-        # respect this — it can't reschedule a charge already in progress.
-        if bus.charging_at and bus.charging_started_min is not None:
-            s = bus.charging_started_min
-            e = s + charge
-            start = model.NewConstant(s)
-            end = model.NewConstant(e)
-            iv = model.NewIntervalVar(
-                start, charge, end,
-                f"iv_live_{bus.id}_{bus.charging_at}"
-            )
-            intervals[(bus.id, bus.charging_at)] = (start, end, iv)
-            prev_end = end   # this fixed end feeds into the precedence chain
+        for i in range(0, n + 2):
+            for j in range(i + 1, n + 2):
+                if d[j] - d[i] <= R:
+                    continue
+                # x_i + x_j <= 1 + sum_{i<k<j} x_k    (with endpoints fixed to 1)
+                lhs = []
+                fixed_lhs = 0
+                if i == 0:
+                    fixed_lhs += 1
+                else:
+                    lhs.append(x_path[i])
+                if j == n + 1:
+                    fixed_lhs += 1
+                else:
+                    lhs.append(x_path[j])
+                rhs = [x_path[k] for k in range(i + 1, j)]   # k always 1..n here
+                if lhs or rhs:
+                    model.Add(sum(lhs) + fixed_lhs <= 1 + sum(rhs))
+                else:
+                    # Both endpoints, no stations between (only happens with n=0)
+                    # Only feasible if d[j]-d[i] <= R, contradicting the gate above.
+                    # Force infeasible explicitly.
+                    model.AddBoolAnd([model.NewConstant(0)])
 
-        # For each upcoming stop, create decision variables
-        for stop in bus.upcoming:
-            key = (bus.id, stop.station)
-            if key in intervals:
-                # Already modelled as a fixed interval (live charge). Skip.
-                _, end_var, _ = intervals[key]
-                prev_end = end_var
-                continue
-
-            start = model.NewIntVar(actual, horizon, f"start_{bus.id}_{stop.station}")
-            end = model.NewIntVar(actual, horizon, f"end_{bus.id}_{stop.station}")
-            iv = model.NewIntervalVar(
-                start, charge, end,
-                f"iv_{bus.id}_{stop.station}"
-            )
-            intervals[key] = (start, end, iv)
-
-            # Bus cannot start charging before it physically arrives.
-            # This is the fundamental lower bound from the real world.
-            model.Add(start >= stop.actual_arrival_min)
-
-            # Bus must finish at previous station AND travel before arriving here.
-
-            # Combined with H3a (actual arrival), CP-SAT effectively takes
-            # the max of both: start ≥ max(actual_arrival, prev_end + travel)
-            if prev_end is not None:
-                model.Add(start >= prev_end + travel)
-
-            prev_end = end
-
-    # AddCumulative says: at any moment in time, the total "demand" of all
-    # active intervals cannot exceed "capacity" (number of chargers).
-    # Each interval has demand=1 (one bus = one charger slot).
-
-    for station, cfg in scenario.stations.items():
-        station_ivs = [intervals[k][2] for k in intervals if k[1] == station]
-        if not station_ivs:
+    # ──────────────────────────────────────────
+    # Hard rule: charger capacity per station
+    # ──────────────────────────────────────────
+    for st_name, cfg in scenario.stations.items():
+        ivs = [interval[(b.id, st_name)] for b in scenario.buses
+               if (b.id, st_name) in interval]
+        if not ivs:
             continue
-        demands = [1] * len(station_ivs)
-        model.AddCumulative(station_ivs, demands, cfg.chargers)
+        if cfg.chargers == 1:
+            # NoOverlap is the natural primitive for one charger.
+            model.AddNoOverlap(ivs)
+        else:
+            model.AddCumulative(ivs, [1] * len(ivs), cfg.chargers)
 
+    # ──────────────────────────────────────────
+    # Per-bus cost: time controllable by the scheduler
+    #   = total wait at chargers + total time spent charging
+    # Travel time is fixed by physics, so it does not appear here.
+    # ──────────────────────────────────────────
+    bus_cost: dict[str, cp_model.IntVar] = {}
+    bus_total_wait: dict[str, cp_model.IntVar] = {}
 
+    n_stations = len(scenario.stations)
+    per_bus_max = horizon + charge * n_stations
+
+    for bus in scenario.buses:
+        bp = paths[bus.id]
+        if not bp.stations:
+            bus_cost[bus.id] = model.NewConstant(0)
+            bus_total_wait[bus.id] = model.NewConstant(0)
+            continue
+        # 25 × number of charges used
+        chg_term = model.NewIntVar(0, charge * len(bp.stations), f"chg_{bus.id}")
+        model.Add(chg_term == charge * sum(x[(bus.id, s)] for s in bp.stations))
+        # Total wait
+        w_term = model.NewIntVar(0, horizon, f"twait_{bus.id}")
+        model.Add(w_term == sum(wait[(bus.id, s)] for s in bp.stations))
+        # Cost = waits + charge time
+        cost = model.NewIntVar(0, per_bus_max, f"cost_{bus.id}")
+        model.Add(cost == chg_term + w_term)
+        bus_cost[bus.id] = cost
+        bus_total_wait[bus.id] = w_term
+
+    # ──────────────────────────────────────────
+    # Soft objective — three terms, each weighted independently.
+    # ──────────────────────────────────────────
     w = scenario.weights
 
-    wait_vars: list = []
-    wait_lookup: dict = {}        # (bus_id, station) → wait IntVar
-    operator_waits: dict[str, list] = {}
-    op_station_groups: dict[tuple, list] = {}   # (operator, station) → [(delay_min, sv, bus_id)]
-
-    for bus in scenario.buses:
-        for stop in bus.upcoming:
-            key = (bus.id, stop.station)
-            if key not in intervals:
-                continue
-            start, _, _ = intervals[key]
-
-            wait = model.NewIntVar(0, horizon, f"wait_{bus.id}_{stop.station}")
-            model.Add(wait == start - stop.actual_arrival_min)
-            wait_vars.append(wait)
-            wait_lookup[key] = wait
-
-            operator_waits.setdefault(bus.operator, []).append(wait)
-            op_station_groups.setdefault((bus.operator, stop.station), []).append(
-                (stop.delay_min, start, bus.id)
-            )
-
-    n_stops = max(len(wait_vars), 1)
-
-    def _sum_var(terms: list, name: str, per_term_bound: int):
-        if not terms:
-            return model.NewConstant(0)
-        s = model.NewIntVar(0, per_term_bound * len(terms), name)
-        model.Add(s == sum(terms))
-        return s
-
-    # S1: individual — MAX wait (minimax)
-    if wait_vars:
-        individual_max = model.NewIntVar(0, horizon, "ind_max")
-        model.AddMaxEquality(individual_max, wait_vars)
+    # Term 1 — INDIVIDUAL: worst single-bus controllable time (minimax).
+    # Captures "no single bus should wait too long."
+    if bus_cost:
+        individual = model.NewIntVar(0, per_bus_max, "individual_max")
+        model.AddMaxEquality(individual, list(bus_cost.values()))
     else:
-        individual_max = model.NewConstant(0)
+        individual = model.NewConstant(0)
 
-    # S3: network — SUM of all waits
-    network_sum = _sum_var(wait_vars, "net_sum", horizon)
-
-    # S2: operator fairness
-    op_fairness_sum = model.NewConstant(0)
-    if operator_waits:
-        per_op_vars = []
-        for op, waits in operator_waits.items():
-            op_s = model.NewIntVar(0, horizon * len(waits), f"op_{op}")
-            model.Add(op_s == sum(waits))
-            per_op_vars.append(op_s)
-        op_fairness_sum = model.NewIntVar(0, horizon * n_stops, "op_fair")
-        model.Add(op_fairness_sum == sum(per_op_vars))
-
-    # S4: intra-operator wait fairness — O(n) not O(n²)
-
-    intra_op_group_maxes: list = []
-    for (op, station), entries in op_station_groups.items():
-        if len(entries) < 2:
-            continue
-        # Sort by delay ascending: last entry = most delayed = should wait least
-        sorted_entries = sorted(entries, key=lambda x: x[0])
-        group_violations = []
-        for idx in range(len(sorted_entries) - 1):
-            d_lo, _, bid_lo = sorted_entries[idx]       # less delayed
-            d_hi, _, bid_hi = sorted_entries[idx + 1]  # more delayed
-            if d_lo == d_hi:
-                continue
-            wait_lo = wait_lookup.get((bid_lo, station))
-            wait_hi = wait_lookup.get((bid_hi, station))
-            if wait_lo is None or wait_hi is None:
-                continue
-            # violation: more-delayed bus (hi) waited MORE than less-delayed (lo)
-            viol = model.NewIntVar(0, horizon, f"intra_{op}_{station}_{idx}")
-            model.Add(viol >= wait_hi - wait_lo)
-            group_violations.append(viol)
-
-        if not group_violations:
-            continue
-        if len(group_violations) == 1:
-            intra_op_group_maxes.append(group_violations[0])
-        else:
-            # Take the max violation within this group — the worst ordering mistake
-            group_max = model.NewIntVar(0, horizon, f"intra_max_{op}_{station}")
-            model.AddMaxEquality(group_max, group_violations)
-            intra_op_group_maxes.append(group_max)
-
-    intra_operator_sum = _sum_var(intra_op_group_maxes, "intra_op_sum", horizon)
-
-    # Scale weights and build objective
-    wi = int(round(w.individual              * WEIGHT_SCALE))
-    wo = int(round(w.operator                * WEIGHT_SCALE))
-    wn = int(round(w.network                 * WEIGHT_SCALE))
-    wp = int(round(w.intra_operator_priority * WEIGHT_SCALE))
-
-    model.Minimize(
-        wi * individual_max         # worst single-bus wait (minimax)
-        + wo * op_fairness_sum      # operator-level fairness
-        + wn * network_sum          # total system-wide wait
-        + wp * intra_operator_sum   # within-operator delay priority
-    )
-
-    # Search strategy: try assigning the SMALLEST start values first.
-    # WHY: When multiple buses arrive at a station at the same time (clusters),
-
-    all_start_vars = [intervals[k][0] for k in intervals
-                      if not isinstance(intervals[k][0], int)]
-    if all_start_vars:
-        model.AddDecisionStrategy(
-            all_start_vars,
-            cp_model.CHOOSE_FIRST,
-            cp_model.SELECT_MIN_VALUE,
+    # Term 2 — OPERATOR: worst operator's total (minimax across operators).
+    # Captures "each operator's fleet should run smoothly as a group."
+    by_op: dict[str, list[cp_model.IntVar]] = {}
+    for bus in scenario.buses:
+        by_op.setdefault(bus.operator, []).append(bus_cost[bus.id])
+    op_sums: list[cp_model.IntVar] = []
+    for op, costs in by_op.items():
+        s = model.NewIntVar(0, per_bus_max * len(costs), f"opsum_{op}")
+        model.Add(s == sum(costs))
+        op_sums.append(s)
+    if op_sums:
+        operator_max = model.NewIntVar(
+            0, per_bus_max * len(scenario.buses), "operator_max"
         )
+        model.AddMaxEquality(operator_max, op_sums)
+    else:
+        operator_max = model.NewConstant(0)
+
+    # Term 3 — OVERALL: sum across all buses (network throughput).
+    if bus_cost:
+        overall = model.NewIntVar(
+            0, per_bus_max * len(scenario.buses), "overall_sum"
+        )
+        model.Add(overall == sum(bus_cost.values()))
+    else:
+        overall = model.NewConstant(0)
+
+    wi = int(round(w.individual * WEIGHT_SCALE))
+    wo = int(round(w.operator * WEIGHT_SCALE))
+    wn = int(round(w.overall * WEIGHT_SCALE))
+    model.Minimize(wi * individual + wo * operator_max + wn * overall)
+
+    # ──────────────────────────────────────────
+    # Search hint — try smaller start values first. With multiple buses arriving
+    # at the same time, this mimics first-come-first-served and prunes symmetric
+    # alternatives.
+    # ──────────────────────────────────────────
+    all_starts = list(start.values())
+    if all_starts:
+        model.AddDecisionStrategy(
+            all_starts, cp_model.CHOOSE_FIRST, cp_model.SELECT_MIN_VALUE
+        )
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
     solver.parameters.num_search_workers = 4
     status_code = solver.Solve(model)
-
     status_name = solver.StatusName(status_code)
 
-    # If no feasible solution found, return empty schedule
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return Schedule(
+            by_bus={},
             by_station={s: [] for s in scenario.stations},
-            total_wait_min=0,
-            objective=float("inf"),
             status=status_name,
+            objective=float("inf"),
+            total_wait_min=0,
+            total_charge_min=0,
         )
 
-    # ── Extract results ───────────────────────────────────────────────────
-    by_station: dict[str, list[ChargingSlot]] = {s: [] for s in scenario.stations}
-    total_wait = 0
+    # ──────────────────────────────────────────
+    # Extract results
+    # ──────────────────────────────────────────
+    by_bus: dict[str, BusTimeline] = {}
+    by_station: dict[str, list[ChargeEvent]] = {s: [] for s in scenario.stations}
+    grand_wait = 0
+    grand_charge = 0
 
     for bus in scenario.buses:
-        # Include the live in-progress charge so UI shows current reality
-        if bus.charging_at and bus.charging_started_min is not None:
-            s_min = bus.charging_started_min
-            # Find the corresponding stop's scheduled arrival (if any)
-            # The live charge has no "upcoming" stop, so we use charging_started as both
-            slot = ChargingSlot(
-                bus_id=bus.id,
-                operator=bus.operator,
-                direction=bus.direction,
-                station=bus.charging_at,
-                start_min=s_min,
-                end_min=s_min + charge,
-                actual_arrival_min=s_min,   # started immediately on arrival
-                scheduled_arrival_min=s_min,
-                cumulative_wait_min=0,
-                delay_min=0,
-            )
-            by_station[bus.charging_at].append(slot)
-
-        # Extract solver values for upcoming stops
-        for stop in bus.upcoming:
-            key = (bus.id, stop.station)
-            if key not in intervals:
+        bp = paths[bus.id]
+        events: list[ChargeEvent] = []
+        bus_wait = 0
+        bus_charge = 0
+        for st in bp.stations:
+            if not solver.Value(x[(bus.id, st)]):
                 continue
-            start_var, end_var, _ = intervals[key]
-            s_min = int(solver.Value(start_var))
-            e_min = int(solver.Value(end_var))
-            curr_wait = max(s_min - stop.actual_arrival_min, 0)
-            total_wait += curr_wait
-
-            slot = ChargingSlot(
+            arr_v = int(solver.Value(arrive[(bus.id, st)]))
+            s_v = int(solver.Value(start[(bus.id, st)]))
+            e_v = int(solver.Value(end[(bus.id, st)]))
+            w_v = max(s_v - arr_v, 0)
+            ev = ChargeEvent(
                 bus_id=bus.id,
                 operator=bus.operator,
                 direction=bus.direction,
-                station=stop.station,
-                start_min=s_min,
-                end_min=e_min,
-                actual_arrival_min=stop.actual_arrival_min,
-                scheduled_arrival_min=stop.scheduled_arrival_min,
-                cumulative_wait_min=stop.cumulative_wait_min,
-                delay_min=stop.delay_min,
+                station=st,
+                arrive_min=arr_v,
+                start_min=s_v,
+                end_min=e_v,
+                wait_min=w_v,
             )
-            by_station[stop.station].append(slot)
+            events.append(ev)
+            by_station[st].append(ev)
+            bus_wait += w_v
+            bus_charge += charge
+
+        timeline = BusTimeline(
+            bus_id=bus.id,
+            operator=bus.operator,
+            direction=bus.direction,
+            departure_min=bus.departure_min,
+            arrival_at_destination_min=int(solver.Value(final_arrival[bus.id])),
+            total_wait_min=bus_wait,
+            total_charge_min=bus_charge,
+            charges=tuple(events),
+        )
+        by_bus[bus.id] = timeline
+        grand_wait += bus_wait
+        grand_charge += bus_charge
 
     return Schedule(
+        by_bus=by_bus,
         by_station=by_station,
-        total_wait_min=total_wait,
-        objective=solver.ObjectiveValue(),
         status=status_name,
+        objective=float(solver.ObjectiveValue()),
+        total_wait_min=grand_wait,
+        total_charge_min=grand_charge,
     )
