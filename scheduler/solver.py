@@ -5,13 +5,10 @@ The model decides, per bus, *which* charging stations to use and *when* charging
 starts at each. Hard rules (range, charger capacity, route order) are encoded as
 constraints; the soft objective is a weighted combination of three terms read
 from the scenario file.
-
-Adding a new hard rule = one `model.Add(...)` call.
-Adding a new soft term = one new variable and one entry in the `Minimize(...)`.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable
 
 from ortools.sat.python import cp_model
@@ -74,7 +71,7 @@ class Schedule:
 
 
 # ──────────────────────────────────────────────
-# Per-bus path geometry — pre-computed once before model building
+# Per-bus path geometry — pre-computed once
 # ──────────────────────────────────────────────
 
 @dataclass
@@ -123,13 +120,12 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
 
     paths = _build_paths(scenario)
 
-    # Time horizon: latest possible departure + worst-case full traversal +
-    # generous slack for waits in heavy contention.
+    # Tight time horizon layout
     earliest = min((b.departure_min for b in scenario.buses), default=0)
     latest_dep = max((b.departure_min for b in scenario.buses), default=0)
     max_total_distance = max((p.total_distance_km for p in paths.values()), default=0)
     nominal_trip = scenario.travel_min(max_total_distance) + len(scenario.stations) * charge
-    horizon = latest_dep + nominal_trip + len(scenario.buses) * charge + 240
+    horizon = latest_dep + nominal_trip + len(scenario.buses) * charge + 120
 
     # ──────────────────────────────────────────
     # Decision variables
@@ -145,7 +141,6 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
 
     for bus in scenario.buses:
         bp = paths[bus.id]
-        # Origin "leave time" is just the departure — it's a fixed constant.
         prev_leave: cp_model.IntVar = model.NewConstant(bus.departure_min)
         prev_dist_from_origin = 0
 
@@ -159,19 +154,24 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
             x_var = model.NewBoolVar(f"use_{bus.id}_{st}")
             s_var = model.NewIntVar(earliest, horizon, f"st_{bus.id}_{st}")
             e_var = model.NewIntVar(earliest, horizon, f"en_{bus.id}_{st}")
+            
+            # Optimization 1: Strictly tie start and end together to drop a dimension
+            model.Add(e_var == s_var + charge)
+
             iv = model.NewOptionalIntervalVar(
                 s_var, charge, e_var, x_var, f"iv_{bus.id}_{st}"
             )
 
-            # If charging here, can't start before arrival.
+            # Active rules
             model.Add(s_var >= arr).OnlyEnforceIf(x_var)
 
-            # Wait at this station — 0 if not charging.
+            # Optimization 2: Anchor ghost variables when skipping a station
+            model.Add(s_var == arr).OnlyEnforceIf(x_var.Not())
+
             w_var = model.NewIntVar(0, horizon, f"wait_{bus.id}_{st}")
             model.Add(w_var == s_var - arr).OnlyEnforceIf(x_var)
             model.Add(w_var == 0).OnlyEnforceIf(x_var.Not())
 
-            # Leave time: charge end if used, else just pass through.
             lv = model.NewIntVar(earliest, horizon, f"leave_{bus.id}_{st}")
             model.Add(lv == e_var).OnlyEnforceIf(x_var)
             model.Add(lv == arr).OnlyEnforceIf(x_var.Not())
@@ -187,7 +187,6 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
             prev_leave = lv
             prev_dist_from_origin = bp.dist_from_origin[st]
 
-        # Final leg — last station to destination. Always traversed; no charging.
         last_seg_min = scenario.travel_min(bp.last_station_to_destination_km)
         fa = model.NewIntVar(earliest, horizon, f"final_arr_{bus.id}")
         model.Add(fa == prev_leave + last_seg_min)
@@ -196,15 +195,10 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
     # ──────────────────────────────────────────
     # Hard rule: battery range
     # ──────────────────────────────────────────
-    # Path indices 0..n+1 with 0=origin (always "charged"), n+1=destination.
-    # For every (i,j) with i<j and d[j]-d[i] > R, at least one of the stations
-    # strictly between (or one of i,j if they're stations) must be USED. We
-    # express this as a linear constraint with the endpoints as constants 1.
     for bus in scenario.buses:
         bp = paths[bus.id]
         n = len(bp.stations)
         d = [0] + [bp.dist_from_origin[s] for s in bp.stations] + [bp.total_distance_km]
-        # x_path[k] for k in 1..n is the BoolVar; for k=0 and k=n+1 it's a constant 1.
         x_path: list = [None]
         for s in bp.stations:
             x_path.append(x[(bus.id, s)])
@@ -214,7 +208,6 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
             for j in range(i + 1, n + 2):
                 if d[j] - d[i] <= R:
                     continue
-                # x_i + x_j <= 1 + sum_{i<k<j} x_k    (with endpoints fixed to 1)
                 lhs = []
                 fixed_lhs = 0
                 if i == 0:
@@ -225,13 +218,10 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
                     fixed_lhs += 1
                 else:
                     lhs.append(x_path[j])
-                rhs = [x_path[k] for k in range(i + 1, j)]   # k always 1..n here
+                rhs = [x_path[k] for k in range(i + 1, j)]
                 if lhs or rhs:
                     model.Add(sum(lhs) + fixed_lhs <= 1 + sum(rhs))
                 else:
-                    # Both endpoints, no stations between (only happens with n=0)
-                    # Only feasible if d[j]-d[i] <= R, contradicting the gate above.
-                    # Force infeasible explicitly.
                     model.AddBoolAnd([model.NewConstant(0)])
 
     # ──────────────────────────────────────────
@@ -243,15 +233,12 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
         if not ivs:
             continue
         if cfg.chargers == 1:
-            # NoOverlap is the natural primitive for one charger.
             model.AddNoOverlap(ivs)
         else:
             model.AddCumulative(ivs, [1] * len(ivs), cfg.chargers)
 
     # ──────────────────────────────────────────
-    # Per-bus cost: time controllable by the scheduler
-    #   = total wait at chargers + total time spent charging
-    # Travel time is fixed by physics, so it does not appear here.
+    # Per-bus cost computation
     # ──────────────────────────────────────────
     bus_cost: dict[str, cp_model.IntVar] = {}
     bus_total_wait: dict[str, cp_model.IntVar] = {}
@@ -265,50 +252,44 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
             bus_cost[bus.id] = model.NewConstant(0)
             bus_total_wait[bus.id] = model.NewConstant(0)
             continue
-        # 25 × number of charges used
+
         chg_term = model.NewIntVar(0, charge * len(bp.stations), f"chg_{bus.id}")
         model.Add(chg_term == charge * sum(x[(bus.id, s)] for s in bp.stations))
-        # Total wait
+
         w_term = model.NewIntVar(0, horizon, f"twait_{bus.id}")
         model.Add(w_term == sum(wait[(bus.id, s)] for s in bp.stations))
-        # Cost = waits + charge time
+
         cost = model.NewIntVar(0, per_bus_max, f"cost_{bus.id}")
         model.Add(cost == chg_term + w_term)
         bus_cost[bus.id] = cost
         bus_total_wait[bus.id] = w_term
 
     # ──────────────────────────────────────────
-    # Soft objective — three terms, each weighted independently.
+    # Soft objective — Optimized Minimax
     # ──────────────────────────────────────────
     w = scenario.weights
 
-    # Term 1 — INDIVIDUAL: worst single-bus controllable time (minimax).
-    # Captures "no single bus should wait too long."
+    # Term 1 — INDIVIDUAL
     if bus_cost:
         individual = model.NewIntVar(0, per_bus_max, "individual_max")
-        model.AddMaxEquality(individual, list(bus_cost.values()))
+        for cost in bus_cost.values():
+            model.Add(individual >= cost)
     else:
         individual = model.NewConstant(0)
 
-    # Term 2 — OPERATOR: worst operator's total (minimax across operators).
-    # Captures "each operator's fleet should run smoothly as a group."
+    # Term 2 — OPERATOR
     by_op: dict[str, list[cp_model.IntVar]] = {}
     for bus in scenario.buses:
         by_op.setdefault(bus.operator, []).append(bus_cost[bus.id])
-    op_sums: list[cp_model.IntVar] = []
-    for op, costs in by_op.items():
-        s = model.NewIntVar(0, per_bus_max * len(costs), f"opsum_{op}")
-        model.Add(s == sum(costs))
-        op_sums.append(s)
-    if op_sums:
-        operator_max = model.NewIntVar(
-            0, per_bus_max * len(scenario.buses), "operator_max"
-        )
-        model.AddMaxEquality(operator_max, op_sums)
+
+    if by_op:
+        operator_max = model.NewIntVar(0, per_bus_max * WEIGHT_SCALE, "operator_max")
+        for op, costs in by_op.items():
+            model.Add(operator_max * len(costs) >= sum(costs) * WEIGHT_SCALE)
     else:
         operator_max = model.NewConstant(0)
 
-    # Term 3 — OVERALL: sum across all buses (network throughput).
+    # Term 3 — OVERALL
     if bus_cost:
         overall = model.NewIntVar(
             0, per_bus_max * len(scenario.buses), "overall_sum"
@@ -318,24 +299,18 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
         overall = model.NewConstant(0)
 
     wi = int(round(w.individual * WEIGHT_SCALE))
-    wo = int(round(w.operator * WEIGHT_SCALE))
+    wo = int(round(w.operator))
     wn = int(round(w.overall * WEIGHT_SCALE))
     model.Minimize(wi * individual + wo * operator_max + wn * overall)
 
     # ──────────────────────────────────────────
-    # Search hint — try smaller start values first. With multiple buses arriving
-    # at the same time, this mimics first-come-first-served and prunes symmetric
-    # alternatives.
+    # Optimization 3: Portfolio Tuning
     # ──────────────────────────────────────────
-    all_starts = list(start.values())
-    if all_starts:
-        model.AddDecisionStrategy(
-            all_starts, cp_model.CHOOSE_FIRST, cp_model.SELECT_MIN_VALUE
-        )
-
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
     solver.parameters.num_search_workers = 4
+    solver.parameters.linearization_level = 2  # Fixed field name
+    
     status_code = solver.Solve(model)
     status_name = solver.StatusName(status_code)
 
