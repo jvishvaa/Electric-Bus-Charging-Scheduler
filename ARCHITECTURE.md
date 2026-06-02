@@ -67,7 +67,7 @@ The scenarios in the assessment doc are encoded verbatim here (bus ids, operator
 
 ---
 
-## 2. Mathematical Framework Selection & Solver Trade-offs
+## Mathematical Framework Selection & Solver Trade-offs
 
 The scheduling engine uses **Google OR-Tools CP-SAT**. CP-SAT was selected after evaluating a comprehensive matrix of open-source solvers, commercial mathematical programming suites, and heuristic frameworks against the project's strict single-process Python constraints.
 
