@@ -3,11 +3,12 @@ Streamlit UI — Core Optimization Dashboard
 
 Three views as required by the assessment doc:
   1. Scenario data (raw input + readable table)
-  2. Per-bus timetable (full timeline for each bus)
+  2. Per-Fleet Timetable View (full timeline for each bus)
   3. Per-station charging order (who charged at A/B/C/D and in what order)
 
 Zero scheduling logic lives here — everything goes through `solve(scenario)`.
 """
+
 from __future__ import annotations
 
 import time
@@ -35,7 +36,7 @@ def _hhmm(reference: str, minutes_offset: int) -> str:
 # ──────────────────────────────────────────────
 # Solver call (cached on file path so re-selecting the same scenario is instant)
 # ──────────────────────────────────────────────
-@st.cache_data(show_spinner="Executing Mixed-Integer CP-SAT Optimization Matrix...")
+@st.cache_data(show_spinner="Calculating optimal schedule...")
 def _solve_cached(scenario_path: str) -> tuple[Scenario, Schedule, float]:
     s = load_scenario(scenario_path)
     t0 = time.time()
@@ -47,79 +48,77 @@ def _solve_cached(scenario_path: str) -> tuple[Scenario, Schedule, float]:
 # Renderers
 # ──────────────────────────────────────────────
 def _render_scenario_view(scenario: Scenario) -> None:
-    tab_table, tab_json = st.tabs(["Structured Operational Manifest", "Raw Configuration JSON"])
+    tab_table, tab_json = st.tabs(["Scenario Overview", "Raw Data (JSON)"])
 
     with tab_table:
         forward_dir = f"{scenario.route.endpoints[0]}->{scenario.route.endpoints[1]}"
         
-        # High-density summary cards
+        # Summary metric cards
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Total Active Fleet", len(scenario.buses))
+        c1.metric("Total Buses", len(scenario.buses))
         c2.metric("Bengaluru → Kochi", sum(1 for b in scenario.buses if b.direction == forward_dir))
         c3.metric("Kochi → Bengaluru", sum(1 for b in scenario.buses if b.direction != forward_dir))
         c4.metric("Unique Operators", len({b.operator for b in scenario.buses}))
-        c5.metric("Network Nodes", len(scenario.stations))
+        c5.metric("Charging Stations", len(scenario.stations))
         
-        # Clean metadata specifications
-        st.markdown("##### System Infrastructure Parameters")
+        # Metadata settings
+        st.markdown("##### Route & Charging Settings")
         meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
-        meta_col1.caption(f"**Reference Epoch:** {scenario.reference_time}")
+        meta_col1.caption(f"**Reference Time:** {scenario.reference_time}")
         meta_col2.caption(f"**Charge Duration:** {scenario.charge_minutes} min")
-        meta_col3.caption(f"**Battery Range Window:** {scenario.battery_range_km} km")
-        meta_col4.caption(f"**Nominal Velocity:** {scenario.speed_kmph} km/h")
+        meta_col3.caption(f"**Max Battery Range:** {scenario.battery_range_km} km")
+        meta_col4.caption(f"**Average Speed:** {scenario.speed_kmph} km/h")
 
         st.markdown("---")
-        st.markdown("##### Segment Topology & Network Proximity")
+        st.markdown("##### Route Distances")
         segments_data = [
-            {"Segment Link": f"{s.from_node} ⇄ {s.to_node}", "Distance (km)": s.distance_km}
+            {"Route Segment": f"{s.from_node} ⇄ {s.to_node}", "Distance (km)": s.distance_km}
             for s in scenario.route.segments
         ]
-        # Removed use_container_width here to prevent tab layout loops
-        st.dataframe(segments_data, hide_index=True)
+        st.dataframe(segments_data, hide_index=True, use_container_width=True)
 
         st.markdown("---")
-        st.markdown("##### Base Priority Weights")
+        st.markdown("##### Optimization Goal Weights")
         w_col1, w_col2, w_col3 = st.columns(3)
-        w_col1.caption(f"**Individual Delay Target:** {scenario.weights.individual}")
-        w_col2.caption(f"**Operator Equity Target:** {scenario.weights.operator}")
-        w_col3.caption(f"**System Throughput Target:** {scenario.weights.overall}")
+        w_col1.caption(f"**Individual Bus Wait Weight:** {scenario.weights.individual}")
+        w_col2.caption(f"**Operator Fairness Weight:** {scenario.weights.operator}")
+        w_col3.caption(f"**Overall Network Wait Weight:** {scenario.weights.overall}")
 
         st.markdown("---")
-        st.markdown("##### Raw Fleet Departure Queue")
+        st.markdown("##### Planned Departures")
         rows = [
             {
-                "Bus Identifier": b.id,
-                "Operator Fleet": b.operator.upper(),
-                "Direction Bounds": b.direction,
-                "Scheduled Departure": _hhmm(scenario.reference_time, b.departure_min),
+                "Bus ID": b.id,
+                "Operator": b.operator.upper(),
+                "Route Direction": b.direction,
+                "Departure Time": _hhmm(scenario.reference_time, b.departure_min),
             }
             for b in scenario.buses
         ]
-        # Removed use_container_width here to avoid inner tab sizing cycles
-        st.dataframe(rows, hide_index=True)
+        st.dataframe(rows, hide_index=True, use_container_width=True)
 
     with tab_json:
         st.json(scenario.raw)
 
 
 def _render_summary(scenario: Scenario, sched: Schedule, solve_time: float) -> None:
-    st.markdown("#### Operational Core Telemetry")
+    st.markdown("#### Schedule Metrics")
     
-    # Semantic execution flags
+    # Solver status notification
     if sched.status == "OPTIMAL":
-        st.success("Mathematical Optimality Proven (Global Penalty Minimized)")
+        st.success("Optimal schedule found successfully.")
     elif sched.status == "FEASIBLE":
-        st.info("Feasible Operational Schedule Formulated")
+        st.info("Feasible schedule found.")
     else:
-        st.error(f"Solver Terminated with Status Flags: {sched.status}")
+        st.error(f"Solver ended with status: {sched.status}")
 
-    # Native corporate-grade metric cards
+    # Standard summary metrics cards
     m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Cumulative Wait Time", f"{sched.total_wait_min} min")
-    m2.metric("Mean Wait / Vehicle", f"{sched.total_wait_min / max(len(scenario.buses), 1):.1f} min")
-    m3.metric("System Stress Index", f"{sched.objective:,.0f}", help="Scaled multi-term objective penalty score.")
-    m4.metric("Matrix Solver Runtime", f"{solve_time}s")
-    m5.metric("Total Charging Events", str(sched.total_charge_min // scenario.charge_minutes))
+    m1.metric("Total Wait Time", f"{sched.total_wait_min} min")
+    m2.metric("Average Wait per Bus", f"{sched.total_wait_min / max(len(scenario.buses), 1):.1f} min")
+    m3.metric("Objective Score", f"{sched.objective:,.0f}", help="The combined cost score minimized by the solver.")
+    m4.metric("Solver Runtime", f"{solve_time}s")
+    m5.metric("Total Charges", str(sched.total_charge_min // scenario.charge_minutes))
 
 
 def _render_bus_timetable(scenario: Scenario, sched: Schedule) -> None:
@@ -129,41 +128,40 @@ def _render_bus_timetable(scenario: Scenario, sched: Schedule) -> None:
         tl = sched.by_bus.get(b.id)
         if tl is None:
             rows.append({
-                "Bus Identifier": b.id,
+                "Bus ID": b.id,
                 "Operator": b.operator.upper(),
-                "Direction Bounds": b.direction,
-                "Departure": _hhmm(scenario.reference_time, b.departure_min),
-                "Charging Sequence": "Bypassed",
-                "Full Analytical Timeline": "No feasible tracking profile mapped.",
-                "Total Delay": "—",
-                "Terminal Arrival": "—",
+                "Route Direction": b.direction,
+                "Departure Time": _hhmm(scenario.reference_time, b.departure_min),
+                "Stations Used": "Bypassed",
+                "Detailed Charging Timeline": "No valid schedule generated.",
+                "Total Wait Time": "—",
+                "Arrival Time": "—",
             })
             continue
 
         if tl.charges:
             schedule_str = "  →  ".join(
-                f"[{c.station}] Arr {_hhmm(scenario.reference_time, c.arrive_min)} | "
-                f"Session: {_hhmm(scenario.reference_time, c.start_min)}–{_hhmm(scenario.reference_time, c.end_min)}"
-                + (f" (Wait: {c.wait_min}m)" if c.wait_min > 0 else " (No Wait)")
+                f"[{c.station}] Arrived {_hhmm(scenario.reference_time, c.arrive_min)} | "
+                f"Charged: {_hhmm(scenario.reference_time, c.start_min)}–{_hhmm(scenario.reference_time, c.end_min)}"
+                + (f" (Waited: {c.wait_min}m)" if c.wait_min > 0 else " (No Wait)")
                 for c in tl.charges
             )
             stations_str = " → ".join(c.station for c in tl.charges)
         else:
-            schedule_str = "Direct Transit — No Intermediate Charging Triggered"
+            schedule_str = "Direct Trip — No charging required"
             stations_str = "None"
 
         rows.append({
-            "Bus Identifier": tl.bus_id,
+            "Bus ID": tl.bus_id,
             "Operator": tl.operator.upper(),
-            "Direction Bounds": tl.direction,
-            "Departure": _hhmm(scenario.reference_time, tl.departure_min),
-            "Charging Sequence": stations_str,
-            "Full Analytical Timeline": schedule_str,
-            "Total Delay": f"{tl.total_wait_min} min",
-            "Terminal Arrival": _hhmm(scenario.reference_time, tl.arrival_at_destination_min),
+            "Route Direction": tl.direction,
+            "Departure Time": _hhmm(scenario.reference_time, tl.departure_min),
+            "Stations Used": stations_str,
+            "Detailed Charging Timeline": schedule_str,
+            "Total Wait Time": f"{tl.total_wait_min} min",
+            "Arrival Time": _hhmm(scenario.reference_time, tl.arrival_at_destination_min),
         })
 
-    # Standard width layout to keep horizontal render trees stable
     st.dataframe(rows, hide_index=True)
 
 
@@ -173,29 +171,28 @@ def _render_station(station: str, scenario: Scenario, sched: Schedule) -> None:
 
     # Informational subtitle bar
     st.caption(
-        f"Capacity Allocation Matrix: {cfg.chargers} Hardware Unit(s)  |  "
-        f"Total Allocated Sessions: {len(order)}  |  "
-        f"Aggregate Station Delay: {sum(e.wait_min for e in order)} min"
+        f"Available Chargers: {cfg.chargers} | "
+        f"Total Charges: {len(order)} | "
+        f"Total Station Wait: {sum(e.wait_min for e in order)} min"
     )
 
     if not order:
-        st.info("Station Bypassed: No allocation windows requested by current scheduling matrix.")
+        st.info("No buses are scheduled to charge at this station.")
         return
 
     rows = []
     for i, e in enumerate(order, 1):
         rows.append({
-            "Sequence Block": f"#{i:02d}",
-            "Bus Identifier": e.bus_id,
+            "Queue Order": f"#{i:02d}",
+            "Bus ID": e.bus_id,
             "Operator": e.operator.upper(),
-            "Direction Bounds": e.direction,
-            "Arrival Window": _hhmm(scenario.reference_time, e.arrive_min),
-            "Hook Time": _hhmm(scenario.reference_time, e.start_min),
-            "Disconnection Time": _hhmm(scenario.reference_time, e.end_min),
-            "Queue Bottleneck": f"{e.wait_min} min" if e.wait_min > 0 else "0 min (Clear)"
+            "Route Direction": e.direction,
+            "Arrival Time": _hhmm(scenario.reference_time, e.arrive_min),
+            "Charge Start": _hhmm(scenario.reference_time, e.start_min),
+            "Charge End": _hhmm(scenario.reference_time, e.end_min),
+            "Wait Time": f"{e.wait_min} min" if e.wait_min > 0 else "0 min (No Wait)"
         })
-    # Absolute width bounds here prevent infinite measurement loop within expanders
-    st.dataframe(rows, hide_index=True)
+    st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
 # ──────────────────────────────────────────────
@@ -203,12 +200,12 @@ def _render_station(station: str, scenario: Scenario, sched: Schedule) -> None:
 # ──────────────────────────────────────────────
 def main() -> None:
     st.set_page_config(
-        page_title="Intercity Fleet Charging Optimizer",
+        page_title="Electric Bus Charging Scheduler",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    # Clean CSS modifications that avoid measuring conflicts with Streamlit Core
+    # Clean CSS modifications for styling
     st.markdown("""
         <style>
         .stApp {
@@ -256,41 +253,41 @@ def main() -> None:
         </style>
         """, unsafe_allow_html=True)
     
-    # Institutional Header Matrix
-    st.title("Intercity EV Fleet Charging Scheduler")
-    st.caption("Centralized Multi-Operator Constraint Optimization Platform  |  Powered by Google OR-Tools CP-SAT")
+    # Dashboard Header
+    st.title("Electric Bus Charging Scheduler")
+    st.caption("Centralized Multi-Operator Constraint Optimization Platform | Powered by Google OR-Tools CP-SAT")
     st.markdown("---")
 
     paths = list_scenarios(SCENARIOS_DIR)
     if not paths:
-        st.error(f"Critical System Fault: No scenario definitions found inside directory scope: {SCENARIOS_DIR}.")
+        st.error(f"Error: No scenario files found in directory: {SCENARIOS_DIR}.")
         return
 
     name_to_path = {p.stem: p for p in paths}
     
     # Control Panel Layout Partitioning
     with st.sidebar:
-        st.markdown("### Grid Control Center")
-        st.caption("Select active corridor departure manifests to run the linear resolution matrix.")
+        st.markdown("### Control Panel")
+        # st.caption("Select a scenario to run the scheduler.")
         
         pick = st.selectbox(
-            "Active Operational Scenario Profile",
+            "Select Scenario to run the scheduler.",
             list(name_to_path.keys()),
             format_func=lambda s: s.replace("_", " ").title(),
         )
         
         st.markdown("---")
-        st.markdown("##### Infrastructure Route Context")
-        st.caption("**Corridor Track:** Bi-directional Hub Network")
-        st.caption("**Endpoints:** Bengaluru Depot ⇄ Kochi Terminal")
+        st.markdown("##### Route Information")
+        st.caption("**Route Type:** Bi-directional Corridor")
+        st.caption("**Route Ends:** Bengaluru ⇄ Kochi")
 
     # Pipeline Computation Triggers
     scenario, sched, solve_time = _solve_cached(str(name_to_path[pick]))
     
-    # Layout Segregation using Structured Container blocks
+    # Navigation views tabs
     view_selector = st.radio(
-        "Active System Matrix View",
-        ["System Performance Analytics", "Fleet Timetable View", "Charging Node Infrastructure Queues"],
+        "Select Dashboard View",
+        ["System Performance Analytics", "Fleet Timetable View", "Station Queues"],
         horizontal=True
     )
     st.markdown("---")
@@ -301,42 +298,42 @@ def main() -> None:
         st.markdown("---")
         st.markdown("#### Operator Performance Matrices")
         op_rows = [
-            {"Transit Operator Entity": op.upper(), "Cumulative Infrastructure Delay": f"{wait} min"}
+            {"Operator": op.upper(), "Total Wait Time": f"{wait} min"}
             for op, wait in sched.total_wait_by_operator().items()
         ]
-        st.dataframe(op_rows, hide_index=True)
+        st.dataframe(op_rows, hide_index=True, use_container_width=True)
 
         st.markdown("---")
         st.markdown("#### Source Scenario Parameter Profiler")
         _render_scenario_view(scenario)
 
     elif view_selector == "Fleet Timetable View":
-        st.markdown("#### Comprehensive Vehicle Manifest & Dispatch Log")
-        st.caption("Chronological tracking showing node insertion windows and continuous constraint satisfaction profiles.")
+        st.markdown("#### Bus Master Timetable")
+        st.caption("Complete trip timeline for each bus, including departure, wait times, charging sessions, and arrival.")
         _render_bus_timetable(scenario, sched)
 
-    elif view_selector == "Charging Node Infrastructure Queues":
+    elif view_selector == "Station Queues":
         st.markdown("#### Physical Station Queue Tracking Tables")
-        st.caption("Granular tracking per node validating non-overlapping physical resource boundaries.")
+        st.caption("Detailed order and timing of buses charging at each station.")
         
         station_names = list(scenario.stations.keys())
         
-        # Upper level spatial health summaries
+        # Station load summaries
         summary_cols = st.columns(len(station_names))
         for col, station in zip(summary_cols, station_names):
             with col:
                 events = sched.order_at(station)
                 st.metric(
-                    label=f"Node {station} Load", 
-                    value=f"{len(events)} Sessions", 
-                    help=f"Total active connections handled at Station {station}."
+                    label=f"Station {station} Load", 
+                    value=f"{len(events)} Charges", 
+                    help=f"Total number of times a bus charges at station {station}."
                 )
         
         st.markdown("---")
         
-        # Clean expandable accordions for station timelines
+        # Station timelines dropdown accordions
         for station in station_names:
-            with st.expander(f"⚙️ Node Station {station} Timeline Manifest", expanded=False):
+            with st.expander(f"🔌 Station {station} Queue Details", expanded=False):
                 _render_station(station, scenario, sched)
 
 
