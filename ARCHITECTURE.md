@@ -1,5 +1,7 @@
 # Architecture
 
+> Companion documents: see `PRODUCT.md` for the product framing (who, why, success metrics) and `README.md` for the operational quick start.
+
 ## What this system does
 
 A single-process Streamlit app reads a scenario JSON file (route + buses + departure times + weights), feeds it into a CP-SAT constraint solver, and renders the per-bus schedule and per-station charging order.
@@ -8,6 +10,8 @@ The scheduler decides two things for every bus:
 
 1. **Which** stations the bus uses (any subset of A/B/C/D such that no leg between charges exceeds the battery range).
 2. **When** it charges at each — i.e. the order in which buses use each charger.
+
+The deployed app is hosted at <https://jvishvaa.streamlit.app/>.
 
 ---
 
@@ -146,6 +150,39 @@ Weights are read from the scenario JSON. CP-SAT requires integer coefficients, s
 
 ---
 
+## Changing a weight
+
+The three soft-rule weights live in one block of the scenario JSON. Editing them is the entire workflow — no Python changes, no rebuild, no restart logic beyond Streamlit's own auto-reload.
+
+```jsonc
+// scenarios/scenario_4_operator_heavy.json
+"weights": {
+  "individual": 1.0,
+  "operator":   2.0,   // ← tune this and reload the app
+  "overall":    1.0
+}
+```
+
+What happens when the JSON changes:
+
+1. `loader.py` reads the new floats and constructs a `Weights` dataclass.
+2. `solver.py` reads `scenario.weights.individual / operator / overall` directly when it builds the objective:
+
+   ```python
+   wi = int(round(w.individual * WEIGHT_SCALE))
+   wo = int(round(w.operator   * WEIGHT_SCALE))
+   wn = int(round(w.overall    * WEIGHT_SCALE))
+   primary_objective = wi * individual + wo * operator_max + wn * overall
+   ```
+
+3. CP-SAT re-solves with the new objective on the next page load.
+
+There is no second place where weights are referenced. They are not embedded in Python defaults, not duplicated in the UI, not cached anywhere except the standard Streamlit data cache (which keys on the scenario file path).
+
+To **add** a new weight, see _How to add a new weight_ in `README.md` — four small edits, one per layer.
+
+---
+
 ## Adding a new hard rule
 
 > _Example: KPN buses cannot charge at station B before 21:00._
@@ -241,3 +278,46 @@ Buses choose their station set, so each charging session is _optional_. CP-SAT's
 ### Range constraint as a covering inequality, not as path enumeration
 
 We could enumerate every legal subset of stations (there are only 8 for a 540-km trip with 4 inner stations) and force the bus to pick one. The covering inequality is cleaner: it scales to any number of stations, doesn't pre-compute subsets, and doesn't bias the search toward any particular cover.
+
+---
+
+## Assumptions
+
+The assessment doc is intentionally underspecified in places. Here is everything we decided, why, and where you'd change it if the assumption no longer holds.
+
+### Physical assumptions
+
+- **Constant travel speed.** All buses move at `speed_kmph` (60 km/h by default). No traffic, no acceleration profile, no driver-skill variance. Travel time on a segment is `round(km × 60 / speed_kmph)` minutes. _Lever:_ `speed_kmph` in the scenario JSON. A future change to per-segment speeds is a one-field extension to `Segment`.
+- **Charging is always to full, always 25 minutes.** The doc requires this. We treat it as a hard physical constant per scenario. _Lever:_ `charge_minutes`. Variable-duration charging is described in the roadmap table above.
+- **Buses leave their origin with a full 240 km range.** The doc explicitly states the endpoints have slow chargers that fully charge buses before departure, so we do not model endpoint queuing.
+- **Buses do not refuel between trips.** Each bus appears once per scenario, makes one trip, and is done. No round-trips, no driver shifts.
+
+### Modelling assumptions
+
+- **Time is in integer minutes from a per-scenario `reference_time`.** Wall-clock and timezone are display concerns; the solver only sees integers. Reference time is "19:00" in all supplied scenarios but it has no semantic meaning — sliding it shifts every output HH:MM by the same amount.
+- **A scenario's HH:MM strings represent times within ±12 hours of `reference_time`.** The loader uses ±12h disambiguation to decide whether "01:30" means 6.5 hours ahead of "19:00" or 17.5 hours behind. This handles late-night arrivals correctly without needing date fields.
+- **The route is a 1-D corridor.** Nodes are linearly ordered; "distance between" is the sum of segment distances on the unique path. Branching routes are not modelled.
+- **Direction is a string.** `"Bengaluru->Kochi"` and `"Kochi->Bengaluru"` are the two used today. The model never parses them — they are matched verbatim in `Route.path(direction)`. A third direction-string is a data change, not a code change.
+- **Operators are strings.** No fixed enum, no operator metadata. The solver buckets by string equality.
+- **Charger capacity is interchangeable within a station.** When `chargers > 1`, any free charger can serve any bus. There is no "this charger only serves KPN" or "this charger is faster."
+
+### Objective assumptions
+
+- **Controllable cost = wait + charge time.** Travel time is fixed by physics for any given charging plan; the solver cannot affect it, so we exclude it from the per-bus cost. This keeps the objective interpretable as "minimise the controllable inefficiency."
+- **The number of charges a bus performs is part of its cost.** A bus that charges 3 times (75 minutes) is penalised more than one that charges 2 times (50 minutes), all else equal. This naturally biases the solver toward minimum-charge plans without a separate hard rule.
+- **Operator fairness is the worst per-operator total wait, not the variance or the gini coefficient.** Minimax is simpler, well-understood, and matches how dispatchers describe fairness in conversation ("don't let any one operator's fleet absorb the queue").
+- **Ties are broken by penalising waits at earlier stations more than at later ones.** Two solutions with the same primary objective are not equivalent for drivers — the one that pushes waits later in the trip is preferred (early waits compound; late ones don't). This is a pure tie-breaker; the primary objective is scaled up by 100 to ensure it always dominates.
+
+### Operational assumptions
+
+- **The scenario file is authoritative.** If a value (range, speed, charger count, weight) appears in the JSON, the solver uses that value. Python defaults exist only for fields a scenario can omit (charger count, optional bus flags). Engineers tune by editing JSON.
+- **No partial scenarios.** Every scenario must specify every field the loader expects. Failing fast on a malformed scenario is preferable to silently using a default.
+- **Solver time-limit is 30 seconds.** Hardcoded in `app.py`'s `_solve_cached`. CP-SAT typically proves optimality for 20-bus scenarios in well under a second; the limit exists as a safety net for larger fleets in future. If the solver returns FEASIBLE rather than OPTIMAL within the limit, the schedule is still valid and the UI surfaces the status.
+- **Streamlit caches solver output by scenario file path.** Re-selecting the same scenario is instant. Editing the JSON invalidates the cache because Streamlit hashes the input arguments, not file content — so a hard-reload may be needed when iterating on weights. (For the assessment scope, this is acceptable.)
+- **No persistence.** Schedules are recomputed every page load. Nothing is written back to disk. This is a deliberate scope decision documented in `PRODUCT.md`.
+
+### What we explicitly decided _not_ to assume
+
+- **No operator priority is hardcoded.** KPN, Freshbus, and Flixbus are treated identically. Operator-heavy scenarios produce different schedules only because the objective weights differ, not because any operator gets special treatment in code.
+- **No station is "preferred."** A, B, C, D are interchangeable from the solver's point of view. The covering inequality lets the solver pick any feasible subset; the objective drives which subset wins.
+- **No bus is "harder to schedule" than another.** All buses are treated as identical decision agents. Heterogeneity (priority pass, range) is added by extending the `Bus` dataclass, not by special-casing.

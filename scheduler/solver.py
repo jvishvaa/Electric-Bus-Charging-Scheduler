@@ -1,11 +1,3 @@
-"""
-CP-SAT scheduler.
-
-The model decides, per bus, *which* charging stations to use and *when* charging
-starts at each. Hard rules (range, charger capacity, route order) are encoded as
-constraints; the soft objective is a weighted combination of three terms read
-from the scenario file.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass

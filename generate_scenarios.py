@@ -1,11 +1,3 @@
-"""
-Emit the 5 scenario JSON files described in the assessment doc.
-
-Each scenario file is the *complete* input the scheduler reads — route, battery
-range, charge time, speed, station charger counts, weights, and the bus list
-with departure times. Editing one of these files (or dropping in a new one) is
-enough to change the world the scheduler operates in; no Python change needed.
-"""
 from __future__ import annotations
 
 import json

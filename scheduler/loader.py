@@ -1,10 +1,3 @@
-"""
-Read a scenario JSON file and return a typed `Scenario`.
-
-The loader is the only file that touches JSON. It validates the shape, converts
-HH:MM strings to integer minutes, and assembles the typed objects. Everything
-downstream (solver, UI) works with the typed objects only.
-"""
 from __future__ import annotations
 
 import json
@@ -24,9 +17,6 @@ def _hhmm_to_min(reference: str, hhmm: str) -> int:
     """
     Convert an HH:MM string to minutes from `reference` (also HH:MM).
 
-    Result is signed. If the time-of-day is more than 12h ahead of `reference`,
-    we treat it as the previous day; symmetric for the other direction. This
-    matters when `reference = 19:00` but a bus arrives at "01:30" the next day.
     """
     rh, rm = (int(p) for p in reference.split(":"))
     h, m = (int(p) for p in hhmm.split(":"))

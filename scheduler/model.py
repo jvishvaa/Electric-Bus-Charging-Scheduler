@@ -1,10 +1,3 @@
-"""
-Pure data shapes for the bus charging scheduler.
-
-No logic, no I/O. The scenario JSON parses into these; the solver consumes
-these; the UI renders these. Adding a new field here is the *only* place that
-changes when the world grows (new endpoint, new station, new bus property).
-"""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal

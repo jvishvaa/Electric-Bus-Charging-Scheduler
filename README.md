@@ -2,9 +2,19 @@
 
 A scheduler for electric buses on the Bengaluru → A → B → C → D → Kochi route, built with Python, Streamlit, and Google OR-Tools CP-SAT. Given a list of bus departures, the scheduler decides each bus's charging plan (which stations it uses) and the order in which buses use each charger.
 
+**Hosted demo:** <https://jvishvaa.streamlit.app/>
+
 ## The problem in one sentence
 
 20 buses (10 Bengaluru→Kochi, 10 Kochi→Bengaluru) share 4 charging stations along a 540 km route. Battery range is 240 km, every charge takes 25 minutes and fills to full, each station has 1 charger. Decide who charges where, and when.
+
+## Companion documents
+
+| Document           | What's in it                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `PRODUCT.md`       | Why this product exists, who it's for, what it does and doesn't do today, how success is measured.              |
+| `ARCHITECTURE.md`  | Framework choice (CP-SAT) and why, data-model design, anticipated changes, how to add a rule, assumptions made. |
+| `README.md` (here) | How to run it, how to change a weight, project layout, the 5 supplied scenarios.                                |
 
 ## Quick start
 
@@ -16,6 +26,8 @@ streamlit run app.py
 
 Open <http://localhost:8501>, pick a scenario, see the schedule.
 
+Python 3.11+ is recommended. Dependencies are pinned in `requirements.txt`; Streamlit Community Cloud installs them automatically on deploy.
+
 ## Project structure
 
 ```
@@ -23,6 +35,9 @@ bus-charging-scheduler/
 ├── app.py                      Streamlit UI (no scheduling logic)
 ├── generate_scenarios.py       Emits the 5 scenario JSON files
 ├── requirements.txt
+├── PRODUCT.md                  Product overview — what / why / for whom
+├── ARCHITECTURE.md             Engineering deep-dive — framework, model, trade-offs
+├── README.md                   This file — operational quick start
 ├── scenarios/
 │   ├── scenario_1_even_spacing.json
 │   ├── scenario_2_bunched_start.json
@@ -35,7 +50,7 @@ bus-charging-scheduler/
     └── solver.py               CP-SAT model → returns Schedule
 ```
 
-Each layer has exactly one job. See `ARCHITECTURE.md` for details.
+Each layer has exactly one job. See `ARCHITECTURE.md` for the rationale and data flow.
 
 ## The 5 scenarios
 
@@ -63,6 +78,20 @@ Everything physical and every weight lives in the scenario JSON.
 
 To use a brand-new scenario: drop a JSON file into `scenarios/`. The UI picks it up on the next reload.
 
+## How to change a weight
+
+Open the scenario JSON and edit the `weights` block:
+
+```jsonc
+"weights": {
+  "individual": 1.0,   // worst single-bus wait (minimax)
+  "operator":   2.0,   // worst per-operator total wait (minimax — fairness)
+  "overall":    1.0    // sum of all waits (network throughput)
+}
+```
+
+Save, reload the app — the new schedule reflects the new weights.
+
 ## How to add a new rule
 
 See **Adding a new hard rule** and **Adding a new soft rule** in `ARCHITECTURE.md` — both are 5–10 lines of Python in `solver.py`, no other file changes.
@@ -78,3 +107,11 @@ See **Adding a new hard rule** and **Adding a new soft rule** in `ARCHITECTURE.m
 
 - **Endpoint slow-charging** — buses always start with full range, as the doc states. We don't model the slow-charging hardware at Bengaluru/Kochi because the buses simply leave with a 240 km range.
 - **Multiple chargers per station** — the model supports it (set `chargers > 1` in the JSON, the solver switches from `NoOverlap` to `Cumulative`), but the supplied scenarios all use 1 as the doc specifies.
+
+## Submission checklist
+
+- [x] Hosted Streamlit app — <https://jvishvaa.streamlit.app/>
+- [x] All 5 scenarios encoded (`scenarios/*.json`)
+- [x] `PRODUCT.md`, `README.md`, `ARCHITECTURE.md`
+- [x] Scheduler is data-driven; new world shape = new JSON, no code change
+- [x] Weights are tunable in one obvious place (the scenario JSON)
