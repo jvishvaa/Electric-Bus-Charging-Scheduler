@@ -79,6 +79,8 @@ def load_scenario(path: str | Path) -> Scenario:
             operator=b["operator"],
             direction=b["direction"],
             departure_min=_hhmm_to_min(reference, b["departure"]),
+            priority_pass_wait_time=bool(b.get("priority_pass_wait_time", False)),
+            min_soc_limit=int(b.get("min_soc_limit", 30)),
         )
         for b in raw["buses"]
     )

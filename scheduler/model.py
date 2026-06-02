@@ -88,6 +88,8 @@ class Bus:
     operator: str
     direction: Direction
     departure_min: int   # minutes after `Scenario.reference_time`
+    priority_pass_wait_time: bool = False
+    min_soc_limit: int = 30
 
 
 @dataclass(frozen=True)

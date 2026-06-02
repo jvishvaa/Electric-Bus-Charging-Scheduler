@@ -301,7 +301,30 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
     wi = int(round(w.individual * WEIGHT_SCALE))
     wo = int(round(w.operator))
     wn = int(round(w.overall * WEIGHT_SCALE))
-    model.Minimize(wi * individual + wo * operator_max + wn * overall)
+    
+    # Base configuration weights combined into the primary objective expression
+    primary_objective = wi * individual + wo * operator_max + wn * overall
+
+    # ──────────────────────────────────────────
+    # Micro Tie-Breaker: Force Earliest-Possible Latching
+    # ──────────────────────────────────────────
+    # We penalize waiting at earlier stations more heavily.
+    # Since `bp.stations` is pre-sorted in the exact chronological travel order 
+    # of the bus, `bp.stations[0]` is always the first station encountered.
+    tie_breaker_terms = []
+    for bus in scenario.buses:
+        bp = paths[bus.id]
+        for idx, st in enumerate(bp.stations):
+            if (bus.id, st) in wait:
+                # The first station encountered gets a high multiplier weight.
+                # Downstream stations get progressively lower weight multipliers.
+                proximity_weight = len(bp.stations) - idx
+                tie_breaker_terms.append(wait[(bus.id, st)] * proximity_weight)
+
+    # Hierarchical Scale Integration:
+    # We scale the primary business constraints up by 100 so that a micro tie-breaker
+    # can never compromise the global baseline mathematical metrics.
+    model.Minimize(primary_objective * 100 + sum(tie_breaker_terms))
 
     # ──────────────────────────────────────────
     # Optimization 3: Portfolio Tuning

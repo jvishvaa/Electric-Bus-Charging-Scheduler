@@ -69,121 +69,161 @@
       "id": "bus-BK-01",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "19:00"
+      "departure": "19:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-02",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "19:15"
+      "departure": "19:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-03",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "19:30"
+      "departure": "19:30",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-04",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "19:45"
+      "departure": "19:45",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-05",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "20:00"
+      "departure": "20:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-06",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "20:15"
+      "departure": "20:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-07",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "20:30"
+      "departure": "20:30",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-08",
       "operator": "kpn",
       "direction": "Bengaluru->Kochi",
-      "departure": "20:45"
+      "departure": "20:45",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-09",
       "operator": "freshbus",
       "direction": "Bengaluru->Kochi",
-      "departure": "21:00"
+      "departure": "21:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-BK-10",
       "operator": "flixbus",
       "direction": "Bengaluru->Kochi",
-      "departure": "21:15"
+      "departure": "21:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-01",
       "operator": "freshbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "19:00"
+      "departure": "19:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-02",
       "operator": "flixbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "19:15"
+      "departure": "19:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-03",
       "operator": "kpn",
       "direction": "Kochi->Bengaluru",
-      "departure": "19:30"
+      "departure": "19:30",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-04",
       "operator": "freshbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "19:45"
+      "departure": "19:45",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-05",
       "operator": "flixbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "20:00"
+      "departure": "20:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-06",
       "operator": "kpn",
       "direction": "Kochi->Bengaluru",
-      "departure": "20:15"
+      "departure": "20:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-07",
       "operator": "freshbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "20:30"
+      "departure": "20:30",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-08",
       "operator": "flixbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "20:45"
+      "departure": "20:45",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-09",
       "operator": "kpn",
       "direction": "Kochi->Bengaluru",
-      "departure": "21:00"
+      "departure": "21:00",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     },
     {
       "id": "bus-KB-10",
       "operator": "freshbus",
       "direction": "Kochi->Bengaluru",
-      "departure": "21:15"
+      "departure": "21:15",
+      "priority_pass_wait_time": false,
+      "min_soc_limit": 30
     }
   ]
 }

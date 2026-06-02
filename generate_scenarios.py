@@ -58,12 +58,14 @@ def _envelope(name: str, buses: list[dict],
     }
 
 
-def _bus(bus_id: str, operator: str, direction: str, departure: str) -> dict:
+def _bus(bus_id: str, operator: str, direction: str, departure: str, priority_pass_wait_time: bool = False, min_soc_limit: int = 30) -> dict:
     return {
         "id": bus_id,
         "operator": operator,
         "direction": direction,
         "departure": departure,
+        "priority_pass_wait_time": priority_pass_wait_time,
+        "min_soc_limit": min_soc_limit,
     }
 
 

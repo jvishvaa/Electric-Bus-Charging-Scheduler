@@ -39,27 +39,27 @@ Each layer has exactly one job. See `ARCHITECTURE.md` for details.
 
 ## The 5 scenarios
 
-| # | Name | What it tests |
-|---|---|---|
-| 1 | Even spacing | Baseline — buses depart every 15 min from each end. |
-| 2 | Bunched start | Tight 8-min cluster early, then spaces out. Heavy early contention. |
-| 3 | Asymmetric load | 10 BK vs 4 KB. Uneven traffic across directions. |
-| 4 | Operator-heavy | KPN runs 8 of 10 BK buses. Operator weight = 2.0 — visible policy effect. |
-| 5 | Worst case | All 20 buses inside 72 minutes. Convergence at inner stations. |
+| #   | Name            | What it tests                                                             |
+| --- | --------------- | ------------------------------------------------------------------------- |
+| 1   | Even spacing    | Baseline — buses depart every 15 min from each end.                       |
+| 2   | Bunched start   | Tight 8-min cluster early, then spaces out. Heavy early contention.       |
+| 3   | Asymmetric load | 10 BK vs 4 KB. Uneven traffic across directions.                          |
+| 4   | Operator-heavy  | KPN runs 8 of 10 BK buses. Operator weight = 2.0 — visible policy effect. |
+| 5   | Worst case      | All 20 buses inside 72 minutes. Convergence at inner stations.            |
 
 ## How to change the world without changing code
 
 Everything physical and every weight lives in the scenario JSON.
 
-| To change... | Edit... |
-| --- | --- |
-| Battery range | `battery_range_km` in the JSON |
-| Charge duration | `charge_minutes` |
-| Travel speed | `speed_kmph` |
-| Add or remove a station | `route.nodes`, `route.segments`, `stations` |
-| Charger count at one station | `stations.<name>.chargers` |
-| Tune weights | `weights.individual` / `operator` / `overall` |
-| Add a bus / cancel a bus / change departure | `buses` array |
+| To change...                                | Edit...                                       |
+| ------------------------------------------- | --------------------------------------------- |
+| Battery range                               | `battery_range_km` in the JSON                |
+| Charge duration                             | `charge_minutes`                              |
+| Travel speed                                | `speed_kmph`                                  |
+| Add or remove a station                     | `route.nodes`, `route.segments`, `stations`   |
+| Charger count at one station                | `stations.<name>.chargers`                    |
+| Tune weights                                | `weights.individual` / `operator` / `overall` |
+| Add a bus / cancel a bus / change departure | `buses` array                                 |
 
 To use a brand-new scenario: drop a JSON file into `scenarios/`. The UI picks it up on the next reload.
 
