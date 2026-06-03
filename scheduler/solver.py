@@ -255,6 +255,15 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
         model.Add(cost == chg_term + w_term)
         bus_cost[bus.id] = cost
         bus_total_wait[bus.id] = w_term
+    
+    # ── Hard cap: no single bus waits more than MAX_WAIT_MIN at any one station ──
+    MAX_WAIT_MIN = 60  # no bus should wait more than 1 hour at a single station
+
+    for bus in scenario.buses:
+        bp = paths[bus.id]
+        for st in bp.stations:
+            if (bus.id, st) in wait:
+                model.Add(wait[(bus.id, st)] <= MAX_WAIT_MIN).OnlyEnforceIf(x[(bus.id, st)])
 
     # ──────────────────────────────────────────
     # Soft objective — Optimized Minimax
@@ -312,11 +321,78 @@ def solve(scenario: Scenario, time_limit_s: float = 30.0) -> Schedule:
                 # Downstream stations get progressively lower weight multipliers.
                 proximity_weight = len(bp.stations) - idx
                 tie_breaker_terms.append(wait[(bus.id, st)] * proximity_weight)
+                
+                
+    # ── Hard rule: strict FIFO — earlier arrival completes before later arrival starts ──
+    for st_name in scenario.stations:
+        buses_at_station = [b for b in scenario.buses if (b.id, st_name) in arrive]
+        
+        for i in range(len(buses_at_station)):
+            for j in range(i + 1, len(buses_at_station)):
+                b1, b2 = buses_at_station[i], buses_at_station[j]
+                k1, k2 = (b1.id, st_name), (b2.id, st_name)
+                
+                bp1, bp2 = paths[b1.id], paths[b2.id]
+                arr1 = b1.departure_min + scenario.travel_min(bp1.dist_from_origin[st_name])
+                arr2 = b2.departure_min + scenario.travel_min(bp2.dist_from_origin[st_name])
+                
+                if arr1 == arr2:
+                    # Same arrival — break tie by bus_id lexicographic order
+                    early_k = k1 if b1.id < b2.id else k2
+                    late_k  = k2 if b1.id < b2.id else k1
+                elif arr1 < arr2:
+                    early_k, late_k = k1, k2
+                else:
+                    early_k, late_k = k2, k1
+
+                both_charge = model.NewBoolVar(f"fifo_both_{b1.id}_{b2.id}_{st_name}")
+                model.AddBoolAnd([x[early_k], x[late_k]]).OnlyEnforceIf(both_charge)
+                model.AddBoolOr([x[early_k].Not(), x[late_k].Not()]).OnlyEnforceIf(both_charge.Not())
+
+                # Earlier bus must fully FINISH before later bus STARTS — not just start earlier
+                model.Add(end[early_k] <= start[late_k]).OnlyEnforceIf(both_charge)
+
+
+    # ── REPLACE with a soft penalty, only for very tight bunching (≤10 min) ──
+    TIGHT_THRESHOLD_MIN = 10  # only penalise buses departing within 10 min of each other
+
+    stagger_terms = []
+    dir_sorted = sorted(scenario.buses, key=lambda b: (b.direction, b.departure_min))
+
+    for i in range(len(dir_sorted) - 1):
+        b1, b2 = dir_sorted[i], dir_sorted[i + 1]
+        
+        if b1.direction != b2.direction:
+            continue
+        if b2.departure_min - b1.departure_min > TIGHT_THRESHOLD_MIN:
+            continue  # not tight enough to penalise
+        
+        bp1, bp2 = paths[b1.id], paths[b2.id]
+        common = [s for s in bp1.stations if s in paths[b2.id].stations]
+        
+        for st in common:
+            k1, k2 = (b1.id, st), (b2.id, st)
+            if k1 not in x or k2 not in x:
+                continue
+            
+            both_use = model.NewBoolVar(f"stagger_{b1.id}_{b2.id}_{st}")
+            model.AddBoolAnd([x[k1], x[k2]]).OnlyEnforceIf(both_use)
+            model.AddBoolOr([x[k1].Not(), x[k2].Not()]).OnlyEnforceIf(both_use.Not())
+            stagger_terms.append(both_use)
+
+    # Soft penalty — discourages stacking but doesn't forbid it
+    STAGGER_PENALTY = int(charge * WEIGHT_SCALE)
+
+    model.Minimize(
+        primary_objective * 100 
+        + sum(tie_breaker_terms)
+        + STAGGER_PENALTY * sum(stagger_terms)
+    )
 
     # Hierarchical Scale Integration:
     # We scale the primary business constraints up by 100 so that a micro tie-breaker
     # can never compromise the global baseline mathematical metrics.
-    model.Minimize(primary_objective * 100 + sum(tie_breaker_terms))
+    # model.Minimize(primary_objective * 100 + sum(tie_breaker_terms))
 
     # ──────────────────────────────────────────
     # Optimization 3: Portfolio Tuning
